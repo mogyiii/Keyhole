@@ -89,7 +89,7 @@ public sealed class ProcessResolver(
         {
             ProcessId = processId,
             ExecutablePath = path,
-            DisplayName = BuildDisplayName(processId, path, productName, hostedServices),
+            DisplayName = BuildDisplayName(processId, path, productName, hostedServices, TryGetProcessName(processId)),
             Publisher = publisher,
             Signature = _signatures.Verify(path),
             StartTimeUtc = startTime,
@@ -105,7 +105,8 @@ public sealed class ProcessResolver(
         int processId,
         string? path,
         string? productName,
-        IReadOnlyList<string> hostedServices)
+        IReadOnlyList<string> hostedServices,
+        string? processName)
     {
         var fileName = path is null ? null : Path.GetFileName(path);
         var isServiceHost = string.Equals(fileName, "svchost.exe", StringComparison.OrdinalIgnoreCase);
@@ -121,7 +122,24 @@ public sealed class ProcessResolver(
                 : $"{string.Join(", ", hostedServices.Take(3))}{(hostedServices.Count > 3 ? ", …" : "")} ({suffix})";
         }
 
-        return productName ?? fileName ?? $"PID {processId}";
+        // processName comes from the process list rather than from opening the process, so
+        // it survives the access denial that blanks the path for anything running as
+        // another user. Unelevated this is the difference between "sunshine" and "PID 3876".
+        return productName ?? fileName ?? processName ?? $"PID {processId}";
+    }
+
+    private static string? TryGetProcessName(int processId)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return NullIfBlank(process.ProcessName);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            // Already exited between the socket read and now.
+            return null;
+        }
     }
 
     private static string? TryGetExecutablePath(int processId)

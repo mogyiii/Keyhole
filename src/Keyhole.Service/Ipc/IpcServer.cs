@@ -3,6 +3,7 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text.Json;
 using Keyhole.Core.Ipc;
+using Keyhole.Service.Monitoring;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -175,7 +176,9 @@ public sealed class PingHandler : IIpcMethodHandler
 }
 
 /// <summary>Answers <see cref="IpcMethods.GetStatus"/> with enough for the UI to show a live badge.</summary>
-public sealed class GetStatusHandler(ServiceRuntimeInfo runtime) : IIpcMethodHandler
+public sealed class GetStatusHandler(
+    ServiceRuntimeInfo runtime,
+    MonitorService? monitor = null) : IIpcMethodHandler
 {
     public string Method => IpcMethods.GetStatus;
 
@@ -186,7 +189,12 @@ public sealed class GetStatusHandler(ServiceRuntimeInfo runtime) : IIpcMethodHan
             Version = runtime.Version,
             StartedAtUtc = runtime.StartedAtUtc,
             IsElevated = runtime.IsElevated,
-            MonitorState = null, // No monitoring backend until M2.
+
+            // Null means "no monitor wired up at all", which is different from a monitor
+            // that is running but has not produced its first sample yet.
+            MonitorState = monitor is null ? null : monitor.HasSampled ? "running" : "idle",
+            ActiveConnections = monitor?.ActiveConnections,
+            ByteCountingUnavailableReason = monitor?.ByteCountingUnavailableReason,
         };
 
         return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(status, IpcChannel.Json));

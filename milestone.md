@@ -3,7 +3,7 @@
 > Hálózati forgalom-elemző és -szabályozó .NET alkalmazás Windowsra.
 > Cél: a GlassWire átláthatósága + a Wireshark mélysége, kézi env-var kapcsolgatás nélkül.
 
-**Állapot:** M1 kész ✅ — következik M2 (monitorozás)
+**Állapot:** M2 kész ✅ — következik M3 (UI) vagy M4 (blokkolás)
 **Utolsó frissítés:** 2026-10-25
 
 ---
@@ -76,17 +76,35 @@
 
 ---
 
-## M2 — Monitorozás (olvasó funkciók) ⭐ az első igazi érték
+## M2 — Monitorozás (olvasó funkciók) ✅
 
-- [ ] **Socket-pillanatkép:** `GetExtendedTcpTable` / `GetExtendedUdpTable` → PID szerinti aktív kapcsolatok
-- [ ] **Flow-eventek:** ETW kernel-network szál, kapcsolat-nyitás/zárás és byte-számlálók
-- [ ] **Process-feloldás:** teljes elérési út, ikon, aláírás (Authenticode) és cég kinyerése; svchost esetén service-név
-- [ ] **Hoston-feloldás:** reverse DNS + DNS-cache párosítás az IP-khez (ETW `Microsoft-Windows-DNS-Client`), hogy ne nyers IP-k látszódjanak
-- [ ] **GeoIP** (opcionális, offline MMDB) — ország/ASN a távoli végpontokhoz
-- [ ] Aggregáció: app → host → kapcsolat hierarchia, up/down byte-ok, élő sebesség
-- [ ] Perzisztencia: forgalomtörténet, hogy "mit csinált a gép éjjel" visszanézhető legyen
+- [x] **Socket-pillanatkép:** `GetExtendedTcpTable` / `GetExtendedUdpTable` → PID szerinti aktív kapcsolatok (IPv4 + IPv6)
+- [x] **Byte-számlálók:** ETW kernel-network szál (`EtwByteCounter`), emelt jog nélkül tisztán degradál
+- [x] **Process-feloldás:** elérési út, terméknév, cég, Authenticode-állapot (`WinVerifyTrust`); svchost esetén service-nevek
+- [x] **Hostnév-feloldás:** nem blokkoló reverse DNS, korlátozott párhuzamossággal és külön TTL-lel
+- [x] Aggregáció: app → kapcsolat hierarchia, folyamatonkénti csoportosítás
+- [x] Perzisztencia: SQLite forgalomtörténet + 30 napos retention
+- [ ] **Ikon-kinyerés** az `.exe`-kből — az M3 UI-hoz tartozik, ott logikusabb
+- [ ] **GeoIP** (opcionális, offline MMDB) — elhalasztva, nem blokkol semmit
+- [ ] **Élő sebesség** (byte/s) — byte-számok kellenek hozzá, M3-ban a grafikonnal együtt
 
-**Done, ha:** egy böngésző és egy játék indításakor a lista valós időben, helyes PID-del és feloldott hostnévvel mutatja a forgalmat, és 100+ aktív kapcsolat mellett is < 2% CPU.
+**Done:** valódi forgalmon ellenőrizve — Brave, Claude Code, WinDefend, svchost-szolgáltatások és
+`sunshine` is helyes névvel, kiadóval, aláírás-állapottal és feloldott hostnévvel jelenik meg.
+A drill-down kattintásra megadja a kapcsolatokat PID-enként. 86 teszt zöld.
+
+> **Nem ellenőrzött:** az ETW byte-számlálás **valódi** működése. A session emelt jogot kér, a
+> fejlesztői környezet viszont nem az, így csak az hitelesített, hogy hiánya esetén a monitorozás
+> fut tovább, és a UI meg is indokolja. Az élesítés előtt le kell futtatni emelt jogon — lásd lentebb.
+
+### Megtalált és javított hibák
+
+| Hiba | Hatás | Javítás |
+|---|---|---|
+| TIME_WAIT socketek PID 0-val | 57 kapcsolatból 56 „System Idle Process" alatt gyűlt, uralva a listát | Attribútálhatatlan kapcsolatot nem kezdünk követni; a már ismert gazdájú megmarad |
+| SQLite `UNIQUE` + `NULL` | Minden mintavétel új process-sort írt (igazolva: 3 beszúrás = 3 sor) | `''` szentinel a „nincs hash" jelölésére |
+| Elérési út nem olvasható emelt jog nélkül | 94 svchost és 40 rendszerfolyamat „PID 1792"-ként jelent meg | Szolgáltatásnév az SCM-ből, illetve process-név a folyamatlistából |
+| Elárvult flow-k | Service-leállás után a futó kapcsolatok örökre „aktívak" maradtak (106 vs. 28 valós) | Induláskor lezárás, az utolsó észlelés idejére datálva |
+| `InsertFlow` nem futtatta a parancsot | A flow-k egyáltalán nem íródtak ki | Hiányzó `ExecuteNonQuery()` |
 
 ---
 
@@ -191,8 +209,22 @@ A mostani kényelmetlenség gyökere, hogy a `SSLKEYLOGFILE` **globálisan** van
 
 ---
 
+## Nyitott ellenőrzés: ETW emelt jogon
+
+A byte-számlálás valódi működése még nincs igazolva. Emelt jogú PowerShellben:
+
+```powershell
+dotnet run --project src\Keyhole.Service
+```
+
+Amit látni kell: a `Byte counting needs administrator rights` figyelmeztetés **nem** jelenik meg,
+helyette `ETW byte counting started`. A UI-ban a Traffic oszlop `—` helyett valódi értékeket mutat,
+és a sárga figyelmeztető sáv eltűnik.
+
+Ha hibázik, a `%ProgramData%\Keyhole\logs` naplóban lesz az ok.
+
 ## Következő lépés
 
-M2 első lépése a **D2-spike**: ETW `Microsoft-Windows-Kernel-Network` szál felolvasása és PID-hez
-párosítása. Ezzel párhuzamosan a `GetExtendedTcpTable` pillanatkép adja a már futó kapcsolatokat,
-amiket az ETW nem lát, mert indulás előtt jöttek létre.
+**M3 (UI)** vagy **M4 (blokkolás)** — a sorrend szabadon választható, a kettő független.
+M4 adja a `plan.txt` másik fő kívánságát (gyanús szoftver letiltása), M3 teszi használhatóvá
+a meglévő adatot (grafikonok, keresés, ikonok).

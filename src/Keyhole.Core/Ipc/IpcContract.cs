@@ -31,6 +31,12 @@ public static class IpcMethods
 {
     public const string Ping = "ping";
     public const string GetStatus = "get-status";
+
+    /// <summary>Aggregated per-application view — the main list.</summary>
+    public const string ListApps = "list-apps";
+
+    /// <summary>Connections for one application, for the drill-down view.</summary>
+    public const string ListFlows = "list-flows";
 }
 
 public sealed record IpcRequest
@@ -81,6 +87,64 @@ public sealed record ServiceStatus
     public required DateTimeOffset StartedAtUtc { get; init; }
     public required bool IsElevated { get; init; }
 
-    /// <summary>Set once a monitoring backend exists; null during M1.</summary>
+    /// <summary>"running", "idle" before the first sample, or null when unavailable.</summary>
     public string? MonitorState { get; init; }
+
+    /// <summary>Connections currently tracked, or null when monitoring is unavailable.</summary>
+    public int? ActiveConnections { get; init; }
+
+    /// <summary>
+    /// Why byte totals read zero, or null when counting works. Connection tracking runs
+    /// unelevated but the ETW session does not, so the UI must be able to say why volume
+    /// figures are missing instead of showing zeros that look like real measurements.
+    /// </summary>
+    public string? ByteCountingUnavailableReason { get; init; }
+}
+
+/// <summary>Parameters for <see cref="IpcMethods.ListFlows"/>.</summary>
+public sealed record ListFlowsRequest
+{
+    /// <summary>
+    /// Which application to drill into. Matched against the executable path, falling back
+    /// to the display name for processes with no readable path.
+    /// </summary>
+    public required string Application { get; init; }
+
+    /// <summary>Include connections that have already closed.</summary>
+    public bool IncludeClosed { get; init; } = true;
+}
+
+/// <summary>One row of the application list.</summary>
+public sealed record AppSummary
+{
+    public required string DisplayName { get; init; }
+    public string? ExecutablePath { get; init; }
+    public string? Publisher { get; init; }
+    public required string Signature { get; init; }
+    public required int ActiveConnections { get; init; }
+    public required int TotalConnections { get; init; }
+    public required long BytesSent { get; init; }
+    public required long BytesReceived { get; init; }
+    public required DateTimeOffset LastActiveUtc { get; init; }
+    public IReadOnlyList<string> RecentRemoteHosts { get; init; } = [];
+    public IReadOnlyList<int> ProcessIds { get; init; } = [];
+}
+
+/// <summary>One connection in the drill-down view.</summary>
+public sealed record FlowSummary
+{
+    public required int ProcessId { get; init; }
+    public required string Protocol { get; init; }
+    public required string LocalAddress { get; init; }
+    public required int LocalPort { get; init; }
+    public required string RemoteAddress { get; init; }
+    public required int RemotePort { get; init; }
+    public string? RemoteHostname { get; init; }
+    public required string State { get; init; }
+    public required long BytesSent { get; init; }
+    public required long BytesReceived { get; init; }
+    public required DateTimeOffset StartedUtc { get; init; }
+    public required DateTimeOffset LastSeenUtc { get; init; }
+    public DateTimeOffset? EndedUtc { get; init; }
+    public bool IsActive => EndedUtc is null;
 }

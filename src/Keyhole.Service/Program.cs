@@ -1,8 +1,11 @@
 using Keyhole.Core;
 using Keyhole.Core.Ipc;
+using Keyhole.Core.Monitoring;
 using Keyhole.Core.Storage;
+using Keyhole.Native;
 using Keyhole.Service;
 using Keyhole.Service.Ipc;
+using Keyhole.Service.Monitoring;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Hosting.WindowsServices;
@@ -39,9 +42,28 @@ try
     builder.Services.AddSingleton<ServiceRuntimeInfo>();
     builder.Services.AddSingleton<KeyholeDatabase>(_ => new KeyholeDatabase());
     builder.Services.AddSingleton<MigrationRunner>();
+    builder.Services.AddSingleton<FlowRepository>();
+
+    builder.Services.AddSingleton<ISocketTableReader, SocketTableReader>();
+    builder.Services.AddSingleton<IProcessResolver, ProcessResolver>();
+    builder.Services.AddSingleton<IHostnameResolver, HostnameResolver>();
+
+    // Byte counting needs elevation. When it cannot start, monitoring continues without
+    // volume figures rather than failing, and the reason is reported through get-status.
+    builder.Services.AddSingleton<EtwByteCounter>();
+    builder.Services.AddSingleton<IByteCounterSource>(sp => sp.GetRequiredService<EtwByteCounter>());
+
+    builder.Services.AddSingleton<FlowTracker>();
+
+    // Registered as a singleton as well as a hosted service so GetStatusHandler can read
+    // live monitor state; AddHostedService alone would construct a second instance.
+    builder.Services.AddSingleton<MonitorService>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<MonitorService>());
 
     builder.Services.AddSingleton<IIpcMethodHandler, PingHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, GetStatusHandler>();
+    builder.Services.AddSingleton<IIpcMethodHandler, ListAppsHandler>();
+    builder.Services.AddSingleton<IIpcMethodHandler, ListFlowsHandler>();
     builder.Services.AddHostedService<IpcServer>();
 
     var host = builder.Build();

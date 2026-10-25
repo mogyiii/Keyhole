@@ -56,6 +56,16 @@ public sealed record NetworkConnection
         RemotePort);
 
     /// <summary>
+    /// True when the OS reports no owning process. TCP sockets in TIME_WAIT outlive the
+    /// process that opened them and are reported as PID 0, so a connection first seen in
+    /// this state cannot be attributed to any application.
+    ///
+    /// A flow Keyhole was already tracking keeps the identity it was opened with, so this
+    /// only affects connections that were already finished when monitoring started.
+    /// </summary>
+    public bool IsUnattributable => ProcessId == 0;
+
+    /// <summary>
     /// A listening socket has no peer. These are not traffic and must not become flows,
     /// otherwise every server port would show up as an outbound connection to 0.0.0.0.
     /// </summary>

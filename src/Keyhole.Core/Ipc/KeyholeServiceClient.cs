@@ -32,6 +32,23 @@ public sealed class KeyholeServiceClient(ILogger<KeyholeServiceClient>? logger =
     public Task<ServiceStatus> GetStatusAsync(CancellationToken ct = default) =>
         InvokeAsync<ServiceStatus>(IpcMethods.GetStatus, null, ct);
 
+    /// <summary>Aggregated per-application activity — the main list.</summary>
+    public Task<IReadOnlyList<AppSummary>> ListAppsAsync(CancellationToken ct = default) =>
+        InvokeAsync<IReadOnlyList<AppSummary>>(IpcMethods.ListApps, null, ct);
+
+    /// <summary>
+    /// Connections belonging to one application. <paramref name="application"/> is the
+    /// executable path from <see cref="AppSummary"/>, or its display name when there is none.
+    /// </summary>
+    public Task<IReadOnlyList<FlowSummary>> ListFlowsAsync(
+        string application,
+        bool includeClosed = true,
+        CancellationToken ct = default) =>
+        InvokeAsync<IReadOnlyList<FlowSummary>>(
+            IpcMethods.ListFlows,
+            new ListFlowsRequest { Application = application, IncludeClosed = includeClosed },
+            ct);
+
     /// <summary>
     /// Sends one request and returns its deserialised result.
     /// </summary>

@@ -7,16 +7,16 @@
         x:Class="Keyhole.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Keyhole"
-        Width="720" Height="460"
-        MinWidth="520" MinHeight="360"
+        Width="1100" Height="680"
+        MinWidth="820" MinHeight="520"
         Background="#11131A">
 
   <Window.Styles>
     <Style Selector="TextBlock.label">
       <Setter Property="Foreground" Value="#7D8694" />
-      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontSize" Value="11" />
     </Style>
-    <Style Selector="TextBlock.value">
+    <Style Selector="TextBlock.heading">
       <Setter Property="Foreground" Value="#E6EAF0" />
       <Setter Property="FontSize" Value="13" />
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -26,52 +26,113 @@
       <Setter Property="CornerRadius" Value="10" />
       <Setter Property="BorderBrush" Value="#242935" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="20" />
+    </Style>
+    <Style Selector="DataGrid">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="GridLinesVisibility" Value="Horizontal" />
+      <Setter Property="HorizontalGridLinesBrush" Value="#20242F" />
+      <Setter Property="RowBackground" Value="Transparent" />
+      <Setter Property="Foreground" Value="#C3CAD5" />
     </Style>
   </Window.Styles>
 
-  <Grid RowDefinitions="Auto,*,Auto" Margin="28">
+  <Grid RowDefinitions="Auto,Auto,*" Margin="20">
 
-    <StackPanel Grid.Row="0" Spacing="4">
-      <TextBlock Text="Keyhole" FontSize="26" FontWeight="Bold" Foreground="#E6EAF0" />
-      <TextBlock Text="Network visibility and per-app blocking for Windows"
-                 FontSize="13" Foreground="#7D8694" />
-    </StackPanel>
+    <!-- Header -->
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+      <StackPanel Grid.Column="0" Spacing="2">
+        <TextBlock Text="Keyhole" FontSize="22" FontWeight="Bold" Foreground="#E6EAF0" />
+        <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#7D8694" />
+      </StackPanel>
 
-    <Border Grid.Row="1" Classes="card" Margin="0,24,0,0" VerticalAlignment="Top">
-      <StackPanel Spacing="18">
-
-        <StackPanel Orientation="Horizontal" Spacing="10">
-          <!-- Colour carries the state, but the text repeats it so the status never
-               depends on colour perception alone. -->
-          <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <!-- Colour is backed by the adjacent text so it is never the only signal. -->
+          <Ellipse Width="9" Height="9" VerticalAlignment="Center"
                    Fill="{Binding State, Converter={StaticResource StateToBrush}}" />
-          <TextBlock Text="{Binding State}" Classes="value" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding State}" Classes="heading" VerticalAlignment="Center" />
         </StackPanel>
+        <Button Content="Refresh" Command="{Binding RefreshCommand}"
+                IsEnabled="{Binding !IsBusy}" Padding="14,6" />
+      </StackPanel>
+    </Grid>
 
-        <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap"
-                   Foreground="#C3CAD5" FontSize="13" />
-
-        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto"
-              IsVisible="{Binding ServiceVersion, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <TextBlock Grid.Row="0" Grid.Column="0" Text="Service version" Classes="label" Margin="0,0,16,6" />
-          <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ServiceVersion}" Classes="value" Margin="0,0,0,6" />
-
-          <TextBlock Grid.Row="1" Grid.Column="0" Text="Uptime" Classes="label" Margin="0,0,16,6" />
-          <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ServiceUptime}" Classes="value" Margin="0,0,0,6" />
-
-          <TextBlock Grid.Row="2" Grid.Column="0" Text="Elevated" Classes="label" Margin="0,0,16,0" />
-          <TextBlock Grid.Row="2" Grid.Column="1" Classes="value"
-                     Text="{Binding ServiceIsElevated}" />
-        </Grid>
-
-        <Button Content="Retry" Command="{Binding RefreshCommand}"
-                IsEnabled="{Binding !IsBusy}"
-                HorizontalAlignment="Left" Padding="18,8" />
+    <!-- Warning strip: explains zero byte totals instead of leaving them unexplained -->
+    <Border Grid.Row="1" Classes="card" Margin="0,14,0,0" Padding="14,10"
+            Background="#2A2113" BorderBrush="#4A3A1B"
+            IsVisible="{Binding ByteCountingWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <TextBlock Text="⚠" FontSize="14" Foreground="#D29922" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding ByteCountingWarning}" TextWrapping="Wrap"
+                   Foreground="#E3B341" FontSize="12" VerticalAlignment="Center" />
       </StackPanel>
     </Border>
 
-    <TextBlock Grid.Row="2" Margin="0,20,0,0" FontSize="11" Foreground="#5A6372" TextWrapping="Wrap"
-               Text="M1 shell — verifies the UI reaches the privileged service over the named pipe. Flow monitoring arrives in M2." />
+    <!-- App list over connection drill-down -->
+    <Grid Grid.Row="2" RowDefinitions="2*,Auto,3*" Margin="0,14,0,0">
+
+      <Border Grid.Row="0" Classes="card">
+        <Grid RowDefinitions="Auto,*">
+          <TextBlock Grid.Row="0" Text="Applications" Classes="heading" Margin="16,12,16,8" />
+
+          <DataGrid Grid.Row="1"
+                    ItemsSource="{Binding Apps}"
+                    SelectedItem="{Binding SelectedApp}"
+                    AutoGenerateColumns="False"
+                    IsReadOnly="True"
+                    CanUserResizeColumns="True"
+                    HeadersVisibility="Column"
+                    Margin="6,0,6,6">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Application" Binding="{Binding DisplayName}" Width="2*" />
+              <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}" Width="1.4*" />
+              <DataGridTextColumn Header="Signature" Binding="{Binding Signature}" Width="90" />
+              <DataGridTextColumn Header="Active" Binding="{Binding ActiveConnections}" Width="70" />
+              <DataGridTextColumn Header="Total" Binding="{Binding TotalConnections}" Width="70" />
+              <DataGridTextColumn Header="Traffic" Binding="{Binding Traffic}" Width="150" />
+              <DataGridTextColumn Header="Recent hosts" Binding="{Binding RemoteHosts}" Width="2.5*" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+      </Border>
+
+      <GridSplitter Grid.Row="1" Height="8" Background="Transparent"
+                    HorizontalAlignment="Stretch" ResizeDirection="Rows" />
+
+      <Border Grid.Row="2" Classes="card">
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="16,12,16,8">
+            <TextBlock Text="Connections" Classes="heading" />
+            <TextBlock Text="{Binding SelectedApp.DisplayName, StringFormat='— {0}'}"
+                       Classes="label" VerticalAlignment="Center"
+                       IsVisible="{Binding HasSelection}" />
+          </StackPanel>
+
+          <TextBlock Grid.Row="1" Text="Select an application above to see its connections."
+                     Classes="label" Margin="16,0" VerticalAlignment="Center"
+                     HorizontalAlignment="Center"
+                     IsVisible="{Binding !HasSelection}" />
+
+          <DataGrid Grid.Row="1"
+                    ItemsSource="{Binding Flows}"
+                    AutoGenerateColumns="False"
+                    IsReadOnly="True"
+                    CanUserResizeColumns="True"
+                    HeadersVisibility="Column"
+                    Margin="6,0,6,6"
+                    IsVisible="{Binding HasSelection}">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Proto" Binding="{Binding Protocol}" Width="70" />
+              <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="70" />
+              <DataGridTextColumn Header="Local" Binding="{Binding Local}" Width="1.4*" />
+              <DataGridTextColumn Header="Remote" Binding="{Binding Remote}" Width="2.4*" />
+              <DataGridTextColumn Header="Port" Binding="{Binding RemotePort}" Width="70" />
+              <DataGridTextColumn Header="State" Binding="{Binding State}" Width="1.2*" />
+              <DataGridTextColumn Header="Traffic" Binding="{Binding Traffic}" Width="150" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+      </Border>
+    </Grid>
   </Grid>
 </Window>

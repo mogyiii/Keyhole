@@ -107,6 +107,42 @@ public class ProcessResolverTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void Process_with_an_unreadable_path_still_gets_a_name()
+    {
+        // Unelevated, processes owned by other users deny the path query. Falling back to
+        // the process list keeps the app list readable instead of showing bare PIDs.
+        var unreadable = Process.GetProcesses()
+            .Select(p =>
+            {
+                using (p)
+                {
+                    return _resolver.Resolve(p.Id);
+                }
+            })
+            .Where(i => i.ExecutablePath is null && i.HostedServices.Count == 0)
+            .Where(i => i.ProcessId is not (0 or 4))
+            .ToList();
+
+        if (unreadable.Count == 0)
+        {
+            output.WriteLine("Every process path was readable; nothing to check.");
+            return;
+        }
+
+        output.WriteLine($"{unreadable.Count} process(es) with no readable path:");
+        foreach (var identity in unreadable.Take(5))
+        {
+            output.WriteLine($"  PID {identity.ProcessId}: {identity.DisplayName}");
+        }
+
+        var bare = unreadable.Where(i => i.DisplayName == $"PID {i.ProcessId}").ToList();
+        Assert.True(
+            bare.Count == 0,
+            $"{bare.Count} process(es) fell back to a bare PID: " +
+            string.Join(", ", bare.Take(5).Select(i => i.DisplayName)));
+    }
+
+    [Fact]
     public void Svchost_is_named_by_the_services_it_hosts()
     {
         var svchosts = Process.GetProcessesByName("svchost");

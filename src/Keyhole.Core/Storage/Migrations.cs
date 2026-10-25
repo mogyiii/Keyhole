@@ -77,5 +77,13 @@ internal static class Migrations
                 stopped_utc      TEXT    NULL
             );
             """),
+
+        new(2, "normalise-unhashed-processes", """
+            -- SQLite treats NULLs as distinct in a UNIQUE constraint, so a process row with
+            -- sha256 IS NULL never conflicts with itself: the upsert in FlowRepository would
+            -- insert a duplicate on every sample instead of updating. '' is the "not computed
+            -- yet" sentinel; normalise any rows written before that was understood.
+            UPDATE processes SET sha256 = '' WHERE sha256 IS NULL;
+            """),
     ];
 }
