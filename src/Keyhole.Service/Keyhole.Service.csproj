@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Keyhole.Service</RootNamespace>
+    <AssemblyName>Keyhole.Service</AssemblyName>
+    <UserSecretsId>dotnet-Keyhole.Service-66d1b098-69a0-47cf-97a0-080f8495ccca</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Keyhole.Core\Keyhole.Core.csproj" />
+    <ProjectReference Include="..\Keyhole.Native\Keyhole.Native.csproj" />
+  </ItemGroup>
+
+</Project>

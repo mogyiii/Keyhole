@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Keyhole.App/Keyhole.App.csproj" />
+    <Project Path="src/Keyhole.Core/Keyhole.Core.csproj" />
+    <Project Path="src/Keyhole.Native/Keyhole.Native.csproj" />
+    <Project Path="src/Keyhole.Service/Keyhole.Service.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Keyhole.Tests/Keyhole.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,77 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Keyhole.App.ViewModels"
+        mc:Ignorable="d"
+        x:Class="Keyhole.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Keyhole"
+        Width="720" Height="460"
+        MinWidth="520" MinHeight="360"
+        Background="#11131A">
+
+  <Window.Styles>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="#7D8694" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="TextBlock.value">
+      <Setter Property="Foreground" Value="#E6EAF0" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="#181B24" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="BorderBrush" Value="#242935" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="20" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="28">
+
+    <StackPanel Grid.Row="0" Spacing="4">
+      <TextBlock Text="Keyhole" FontSize="26" FontWeight="Bold" Foreground="#E6EAF0" />
+      <TextBlock Text="Network visibility and per-app blocking for Windows"
+                 FontSize="13" Foreground="#7D8694" />
+    </StackPanel>
+
+    <Border Grid.Row="1" Classes="card" Margin="0,24,0,0" VerticalAlignment="Top">
+      <StackPanel Spacing="18">
+
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <!-- Colour carries the state, but the text repeats it so the status never
+               depends on colour perception alone. -->
+          <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                   Fill="{Binding State, Converter={StaticResource StateToBrush}}" />
+          <TextBlock Text="{Binding State}" Classes="value" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap"
+                   Foreground="#C3CAD5" FontSize="13" />
+
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto"
+              IsVisible="{Binding ServiceVersion, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <TextBlock Grid.Row="0" Grid.Column="0" Text="Service version" Classes="label" Margin="0,0,16,6" />
+          <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ServiceVersion}" Classes="value" Margin="0,0,0,6" />
+
+          <TextBlock Grid.Row="1" Grid.Column="0" Text="Uptime" Classes="label" Margin="0,0,16,6" />
+          <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ServiceUptime}" Classes="value" Margin="0,0,0,6" />
+
+          <TextBlock Grid.Row="2" Grid.Column="0" Text="Elevated" Classes="label" Margin="0,0,16,0" />
+          <TextBlock Grid.Row="2" Grid.Column="1" Classes="value"
+                     Text="{Binding ServiceIsElevated}" />
+        </Grid>
+
+        <Button Content="Retry" Command="{Binding RefreshCommand}"
+                IsEnabled="{Binding !IsBusy}"
+                HorizontalAlignment="Left" Padding="18,8" />
+      </StackPanel>
+    </Border>
+
+    <TextBlock Grid.Row="2" Margin="0,20,0,0" FontSize="11" Foreground="#5A6372" TextWrapping="Wrap"
+               Text="M1 shell — verifies the UI reaches the privileged service over the named pipe. Flow monitoring arrives in M2." />
+  </Grid>
+</Window>

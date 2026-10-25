@@ -1,0 +1,25 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Windows-only by design: ETW, WFP, Windows Firewall COM and Npcap all are. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!-- No SupportedOSPlatformVersion / windows10.0.x TFM on purpose: Keyhole reaches Windows
+         through P/Invoke and COM, not WinRT, so the heavier projection TFM buys nothing. -->
+
+    <Product>Keyhole</Product>
+    <Company>Keyhole</Company>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+</Project>

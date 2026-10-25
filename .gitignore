@@ -1,0 +1,17 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+
+# Keyhole runtime artifacts — never commit captured traffic or TLS keys
+captures/
+*.pcap
+*.pcapng
+*.keylog
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+logs/
+*.log

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Keyhole.Native</RootNamespace>
+    <!-- P/Invoke surface for ETW, iphlpapi, Windows Firewall COM and shell icons. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Keyhole.Core\Keyhole.Core.csproj" />
+  </ItemGroup>
+
+</Project>
