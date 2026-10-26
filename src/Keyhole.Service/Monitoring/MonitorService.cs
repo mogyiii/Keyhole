@@ -109,6 +109,32 @@ public sealed class MonitorService(
         logger.LogInformation("Flow monitoring stopped.");
     }
 
+    /// <summary>
+    /// Writes byte totals one last time on the way out.
+    ///
+    /// The periodic flush exists for crashes; this covers the ordinary case of a service
+    /// stop or restart, where waiting up to another interval would throw away traffic the
+    /// tracker already knows about.
+    /// </summary>
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var updated = repository.UpdateActiveBytes(tracker.Snapshot());
+            if (updated > 0)
+            {
+                logger.LogInformation("Flushed byte totals for {Count} open flows on shutdown.", updated);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Shutdown must not fail because the last write did not land.
+            logger.LogError(ex, "Could not flush byte totals on shutdown.");
+        }
+
+        await base.StopAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private void MaybeFlushBytes()
     {
         if (DateTimeOffset.UtcNow - _lastByteFlushUtc < ByteFlushInterval)
