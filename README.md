@@ -1,9 +1,13 @@
 # Keyhole
 
+[![CI](https://github.com/mogyiii/Keyhole/actions/workflows/ci.yml/badge.svg)](https://github.com/mogyiii/Keyhole/actions/workflows/ci.yml)
+
 Hálózati forgalom-elemző és per-alkalmazás blokkoló Windowsra. A GlassWire átláthatóságát és a
 Wireshark mélységét egy helyen, kézi `SSLKEYLOGFILE` kapcsolgatás nélkül.
 
 A részletes terv és az aktuális állapot: [`milestone.md`](milestone.md).
+
+**Jelenleg:** M2 kész — a monitorozás működik. Blokkolás (M4) és a kész UI (M3) még hátravan.
 
 ## Felépítés
 

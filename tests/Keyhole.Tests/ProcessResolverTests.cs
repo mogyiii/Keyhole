@@ -135,11 +135,31 @@ public class ProcessResolverTests(ITestOutputHelper output)
             output.WriteLine($"  PID {identity.ProcessId}: {identity.DisplayName}");
         }
 
-        var bare = unreadable.Where(i => i.DisplayName == $"PID {i.ProcessId}").ToList();
+        var bare = unreadable
+            .Where(i => i.DisplayName == $"PID {i.ProcessId}")
+            // A process that exited between the enumeration above and its resolution has
+            // no name left to read, and a bare PID is then the honest answer rather than a
+            // defect. The invariant that matters is about processes that are still there.
+            .Where(i => IsRunning(i.ProcessId))
+            .ToList();
+
         Assert.True(
             bare.Count == 0,
-            $"{bare.Count} process(es) fell back to a bare PID: " +
+            $"{bare.Count} live process(es) fell back to a bare PID: " +
             string.Join(", ", bare.Take(5).Select(i => i.DisplayName)));
+    }
+
+    private static bool IsRunning(int processId)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return !process.HasExited;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     [Fact]
