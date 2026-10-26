@@ -111,9 +111,33 @@ public sealed class EtwByteCounter : IByteCounterSource, IDisposable
     }
 
     public ByteCounts GetCounts(ConnectionKey key) =>
-        _tcp.TryGetValue(key, out var counters)
+        _tcp.TryGetValue(Canonical(key), out var counters)
             ? new ByteCounts(Interlocked.Read(ref counters.Sent), Interlocked.Read(ref counters.Received))
             : ByteCounts.Zero;
+
+    /// <summary>
+    /// Orders a connection's two endpoints deterministically.
+    ///
+    /// The kernel provider labels a receive event's endpoints the opposite way round from a
+    /// send on the same connection, so keying on the fields as given files the two
+    /// directions under different keys. Lookups only ever use one of them, which recorded
+    /// every download as zero while uploads looked fine. Ordering the pair makes both
+    /// directions land on one key without needing to know which field the provider calls
+    /// local.
+    ///
+    /// Two sockets with exactly mirrored endpoints would share a key. That requires both
+    /// ends on this machine, so it is confined to loopback.
+    /// </summary>
+    /// <summary>Exposes the ordering to tests; it is the whole correctness argument here.</summary>
+    internal static ConnectionKey CanonicalForTests(ConnectionKey key) => Canonical(key);
+
+    private static ConnectionKey Canonical(ConnectionKey key) =>
+        Canonical(key.LocalAddress, key.LocalPort, key.RemoteAddress, key.RemotePort);
+
+    private static ConnectionKey Canonical(string a, int aPort, string b, int bPort) =>
+        string.CompareOrdinal($"{a}:{aPort}", $"{b}:{bPort}") <= 0
+            ? new ConnectionKey(TransportProtocol.Tcp, a, aPort, b, bPort)
+            : new ConnectionKey(TransportProtocol.Tcp, b, bPort, a, aPort);
 
     public IReadOnlyList<UdpPeer> GetUdpPeers(int processId, int localPort) =>
         _udp
@@ -172,15 +196,13 @@ public sealed class EtwByteCounter : IByteCounterSource, IDisposable
         AddTcp(data.saddr, data.sport, data.daddr, data.dport, data.size, sent: false);
 
     /// <summary>
-    /// ETW reports a send as local→remote and a receive as remote→local. Both are folded
-    /// onto the same key so one connection has one pair of totals rather than two halves.
+    /// Folds both directions of a connection onto one pair of totals. The endpoints are
+    /// ordered rather than taken as given, because the provider labels them differently
+    /// for sends and receives; see <see cref="Canonical(string, int, string, int)"/>.
     /// </summary>
     private void AddTcp(IPAddress source, int sourcePort, IPAddress dest, int destPort, int size, bool sent)
     {
-        var key = sent
-            ? new ConnectionKey(TransportProtocol.Tcp, source.ToString(), sourcePort, dest.ToString(), destPort)
-            : new ConnectionKey(TransportProtocol.Tcp, dest.ToString(), destPort, source.ToString(), sourcePort);
-
+        var key = Canonical(source.ToString(), sourcePort, dest.ToString(), destPort);
         var counters = _tcp.GetOrAdd(key, static _ => new Counters());
 
         if (sent)
