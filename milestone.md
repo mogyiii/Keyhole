@@ -3,7 +3,7 @@
 > Hálózati forgalom-elemző és -szabályozó .NET alkalmazás Windowsra.
 > Cél: a GlassWire átláthatósága + a Wireshark mélysége, kézi env-var kapcsolgatás nélkül.
 
-**Állapot:** M1–M7 kész ✅ + UDP-célpontok és per-app grafikon
+**Állapot:** M1–M7 kész ✅ — telepítve, élesben ellenőrizve
 **Utolsó frissítés:** 2026-10-26
 
 ---
@@ -213,33 +213,41 @@ nem `dotnet run`-ból, hanem a kiadott exe-kből.
 
 ---
 
-## Emelt jogú ellenőrzés — lefutott ✅
+## Élesben ellenőrizve ✅
 
-`scriptserify-elevated.ps1`, 2026-10-26 14:41, **14/14 PASS**:
+A service telepítve (`Program Files\Keyhole`, LocalSystem, automatikus indítás), és valódi
+forgalmon mérve. Minden képesség igazolva:
 
-| Mi | Eredmény |
+| Mi | Bizonyíték |
 |---|---|
-| Service elevated, monitorozás fut | ✅ 15 kapcsolat |
-| **ETW byte-számlálás** | ✅ 5 app valódi forgalommal (pl. `nvcontainer.exe` up 7720 / down 772) |
-| **Tűzfalszabály írása** | ✅ létrehozva, a Windows tűzfalban visszaellenőrizve (Block / Outbound / enabled) |
-| SHA-256 rögzítés | ✅ `match` |
-| Takarítás | ✅ a szabály a tűzfalból és a Keyhole-ból is eltűnt |
+| Elevation | `isElevated: true`, egyetlen figyelmeztetés sem a UI-ban |
+| **ETW byte-számlálás** | TCP up 42,1 MB / down 22,2 MB, UDP up 1,3 MB / down 31,3 MB |
+| **Tűzfal-blokkolás** | szabály létrehozva, a Windows tűzfalban visszaellenőrizve, majd eltakarítva |
+| **UDP/QUIC célpontok** | 653 UDP flow valódi célponttal |
+| **Byte-totálok perzisztálása** | nyitott flow-k számai is kiíródnak (30 mp-enként + leálláskor) |
 
-**UDP-célpontok** (ezt a szkript nem méri, az adatbázisból ellenőriztem): 31 UDP flow valódi
-célponttal, köztük `Dnscache (svchost) → 8.8.8.8:53`. A javítás előtt ezek mind láthatatlanok voltak.
+### Amit az éles futtatás hozott elő
 
-### Amit ez az ellenőrzés hozott elő
+| Hiba | Hogyan derült ki | Javítás |
+|---|---|---|
+| **A TCP letöltés mindig 0 volt** | 16,4 MB küldés, 0 fogadás 37 flow-n. Az eseményszámlálók mutatták, hogy 11 267 fogadás-esemény **megérkezett** — a kernel viszont fordított sorrendben címkézi a végpontokat fogadásnál, így más kulcs alá került | Kanonikus (rendezett) végpont-pár kulcs |
+| Nyitott flow-k byte-számai elvesztek | 16 TCP flow nullával, 31 UDP számokkal | 30 mp-enkénti + leállításkori kiírás |
+| **Az IPC-tesztek a telepített service-t mérték** | A saját szerverük nem tudta megnyitni a foglalt pipe-ot, a kliens a valódihoz csatlakozott — átmentek, miközben a tesztelendő kódból semmit nem futtattak | Tesztenként egyedi pipe-név |
+| A `verify-elevated.ps1` futó service-t várt | Az első futtatás semmit nem csinált | A szkript maga indítja, és csak azt állítja le, amit ő indított |
+| Egy gondolatjel megtörte a PowerShell-szkriptet | PS 5.1 BOM nélkül CP1252-ként olvas; az UTF-8 `—` okos idézőjelre fordul, amit string-lezárónak vesz | A szkriptek csak ASCII-t tartalmaznak |
 
-A zöld pipák mellett az adatbázis egy hibát árult el: **a 16 TCP flow mind nullával** szerepelt,
-miközben a 31 UDP mind byte-számokkal. Ok: a byte-totálok csak *lezáráskor* íródtak ki, így
-minden kapcsolat, ami nyitva volt a service leállásakor, elvesztette a forgalmát a történetből —
-épp a hosszú életű, érdekes kapcsolatok. Javítva: 30 másodpercenként kiíródnak az aktív flow-k
-számai (5 teszt fedi). **Élesben még nem igazolt** — a következő emelt jogú futásnál lesz látható.
+### Ismert korlát
+
+Loopback-kapcsolatoknál (`127.0.0.1` mindkét végen) a fel- és letöltés megegyezik: a két
+oldal ugyanarra a kulcsra esik. A PID-et nem tettem a kulcsba, mert a kernel a TCP
+fogadás-eseményeket gyakran a megszakításkor futó folyamathoz rendeli, nem a socket
+gazdájához — ez elronthatná a most bizonyítottan működő javítást. Valódi hálózati forgalmat
+nem érint.
 
 ### Továbbra is méretlen
 
-**Hosszú terhelési teszt** (memória-szivárgás, WAL-növekedés napokon át). A retention és a prune
-be van kötve és tesztelt, de valós hosszú futás alatt nem mértem.
+**Hosszú terhelési teszt** (memória-szivárgás, WAL-növekedés napokon át). A retention és a
+prune be van kötve és tesztelt, de valós hosszú futás alatt nem mértem.
 
 ---
 
@@ -263,7 +271,7 @@ be van kötve és tesztelt, de valós hosszú futás alatt nem mértem.
 |---|---|
 | **UDP-célpontok ETW-ből** | ✅ a UDP socketek peerenként külön flow-vá bomlanak |
 | **Per-app grafikon** | ✅ a drill-downban, a kapcsolatlista fölött |
-| `verify-elevated.ps1` lefuttatása | ⬜ rajtad a sor — emelt jog kell hozzá |
+| `verify-elevated.ps1` lefuttatása | ✅ 14/14 PASS |
 
 ### Megtalált és javított hiba
 
@@ -273,8 +281,9 @@ be van kötve és tesztelt, de valós hosszú futás alatt nem mértem.
 
 ## Következő lépés
 
-1. **`scriptserify-elevated.ps1`** emelt jogon — ez zárja le a két nyitott ellenőrzést,
-   és egyúttal ez az első alkalom, hogy a UDP-célpontok valódi forgalmon látszanak
-   (ETW nélkül nincs peer, így a UDP most is láthatatlan marad).
-2. **GeoIP** — ország/ASN a távoli végpontokhoz, ha érdekel.
-3. **Top hostok panel** — melyik *célpont* kapja a legtöbb forgalmat, appoktól függetlenül.
+Minden tervezett funkció kész és élesben ellenőrizve. Ha folytatod:
+
+1. **Top hostok panel** — melyik *célpont* kapja a legtöbb forgalmat, appoktól függetlenül.
+   A 22 MB-ot küldő `178.237.23.32` például most csak az app alatt látszik.
+2. **GeoIP** — ország/ASN a távoli végpontokhoz (offline MMDB, nincs hálózati hívás).
+3. **Hosszú terhelési teszt** — az egyetlen méretlen terület.

@@ -104,5 +104,8 @@ Minden a `%ProgramData%\Keyhole` alatt:
 - **UDP-célpontokhoz admin kell.** A UDP socket-tábla nem tartalmaz távoli végpontot, ezért
   a Keyhole az ETW-ből veszi őket — ami emelt jogot igényel. Enélkül a UDP (így a QUIC/HTTP3)
   forgalom nem jelenik meg a listában.
+- **Loopback-forgalomnál a fel/le szám megegyezik.** Ha egy kapcsolat mindkét vége ezen a
+  gépen van (`127.0.0.1`), a két oldal ugyanazt a bejegyzést olvassa, így mindkettő azonos
+  fel- és letöltést mutat. A valódi hálózati forgalmat ez nem érinti.
 - **Antivírus-riasztás lehetséges.** Forgalom-figyelés, ETW-session és környezeti változó
   injektálás — aláíratlan buildnél ez együtt kiverheti a biztosítékot.
