@@ -40,11 +40,11 @@ public sealed class KeyholeServiceClient(ILogger<KeyholeServiceClient>? logger =
     /// Connections belonging to one application. <paramref name="application"/> is the
     /// executable path from <see cref="AppSummary"/>, or its display name when there is none.
     /// </summary>
-    public Task<IReadOnlyList<FlowSummary>> ListFlowsAsync(
+    public Task<FlowsResponse> ListFlowsAsync(
         string application,
         bool includeClosed = true,
         CancellationToken ct = default) =>
-        InvokeAsync<IReadOnlyList<FlowSummary>>(
+        InvokeAsync<FlowsResponse>(
             IpcMethods.ListFlows,
             new ListFlowsRequest { Application = application, IncludeClosed = includeClosed },
             ct);

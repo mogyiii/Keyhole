@@ -115,9 +115,9 @@ public sealed class EtwByteCounter : IByteCounterSource, IDisposable
             ? new ByteCounts(Interlocked.Read(ref counters.Sent), Interlocked.Read(ref counters.Received))
             : ByteCounts.Zero;
 
-    public IReadOnlyList<UdpPeer> GetUdpPeers(int localPort) =>
+    public IReadOnlyList<UdpPeer> GetUdpPeers(int processId, int localPort) =>
         _udp
-            .Where(pair => pair.Key.LocalPort == localPort)
+            .Where(pair => pair.Key.ProcessId == processId && pair.Key.LocalPort == localPort)
             .Select(pair => new UdpPeer(
                 pair.Key.RemoteAddress,
                 pair.Key.RemotePort,
@@ -160,15 +160,17 @@ public sealed class EtwByteCounter : IByteCounterSource, IDisposable
         }
     }
 
+    // ETW carries the owning process on the event itself, which is the only place a UDP
+    // datagram's sender is recorded: the UDP socket table has no peer column at all.
     private void OnUdpSend(UdpIpTraceData data) =>
-        AddUdp(data.sport, data.daddr, data.dport, data.size, sent: true);
+        AddUdp(data.ProcessID, data.sport, data.daddr, data.dport, data.size, sent: true);
 
     private void OnUdpReceive(UdpIpTraceData data) =>
-        AddUdp(data.dport, data.saddr, data.sport, data.size, sent: false);
+        AddUdp(data.ProcessID, data.dport, data.saddr, data.sport, data.size, sent: false);
 
-    private void AddUdp(int localPort, IPAddress remote, int remotePort, int size, bool sent)
+    private void AddUdp(int processId, int localPort, IPAddress remote, int remotePort, int size, bool sent)
     {
-        var key = new UdpKey(localPort, remote.ToString(), remotePort);
+        var key = new UdpKey(processId, localPort, remote.ToString(), remotePort);
         var counters = _udp.GetOrAdd(key, static _ => new Counters());
 
         if (sent)
@@ -221,5 +223,6 @@ public sealed class EtwByteCounter : IByteCounterSource, IDisposable
         public long Received;
     }
 
-    private readonly record struct UdpKey(int LocalPort, string RemoteAddress, int RemotePort);
+    private readonly record struct UdpKey(
+        int ProcessId, int LocalPort, string RemoteAddress, int RemotePort);
 }

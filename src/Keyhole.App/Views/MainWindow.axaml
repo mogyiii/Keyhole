@@ -8,7 +8,7 @@
         x:Class="Keyhole.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Keyhole"
-        Width="1100" Height="680"
+        Width="1180" Height="800"
         MinWidth="820" MinHeight="520"
         Background="{DynamicResource WindowBackground}">
 
@@ -169,12 +169,23 @@
               </StackPanel>
             </TabItem.Header>
 
-            <Grid>
-              <TextBlock Text="Select an application above to see its connections."
+            <Grid RowDefinitions="Auto,*">
+              <TextBlock Grid.Row="1" Text="Select an application above to see its connections."
                          Classes="label" VerticalAlignment="Center" HorizontalAlignment="Center"
                          IsVisible="{Binding !HasSelection}" />
 
-              <DataGrid ItemsSource="{Binding Flows}"
+              <!-- The app's own throughput, on the same scale rules as the dashboard
+                   graph: one axis, two series, both named in the legend above. -->
+              <controls:ThroughputChart Grid.Row="0" Height="72" Margin="4,2,4,6"
+                                        Points="{Binding AppThroughput}"
+                                        IsVisible="{Binding HasSelection}"
+                                        SentBrush="{DynamicResource SeriesUpload}"
+                                        ReceivedBrush="{DynamicResource SeriesDownload}"
+                                        GridBrush="{DynamicResource GridLine}"
+                                        TextBrush="{DynamicResource TextMuted}" />
+
+              <DataGrid Grid.Row="1"
+                        ItemsSource="{Binding Flows}"
                         AutoGenerateColumns="False"
                         IsReadOnly="True"
                         CanUserResizeColumns="True"

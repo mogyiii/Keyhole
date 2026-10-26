@@ -33,7 +33,8 @@ futna elevated módban, minden UI-bug admin-jogosultságú lenne, és minden ind
 - **Ki beszél a hálózaton** — alkalmazásonként, ikonnal, kiadóval, aláírás-állapottal,
   feloldott hostnevekkel; svchost esetén a benne futó szolgáltatás nevével
 - **Mit csinál egy app** — kapcsolatonkénti lebontás PID-del, állapottal, forgalommal
-- **Élő throughput grafikon** fel/le bontásban
+- **Élő throughput grafikon** fel/le bontásban — gépszinten és apponként is
+- **UDP/QUIC célpontokkal** — a socket-tábla ezt nem adja, ezért ETW-ből jön (admin kell)
 - **Blokkolás egy kattintással** — Windows tűzfalszabály, ami túléli az újraindítást;
   a szabály a létrehozáskori SHA-256-ot is elmenti, és jelez, ha a bináris megváltozott
 - **TLS-láthatóság kézi env-var nélkül** — a Keyhole indítja az appot `SSLKEYLOGFILE`-lal,

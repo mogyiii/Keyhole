@@ -105,7 +105,20 @@ public sealed class ListFlowsHandler(FlowTracker tracker) : IIpcMethodHandler
             .Select(ToSummary)
             .ToList();
 
-        return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(flows, IpcChannel.Json));
+        var response = new FlowsResponse
+        {
+            Flows = flows,
+            Throughput = tracker.GetAppThroughput(request.Application)
+                .Select(p => new ThroughputSample
+                {
+                    TimestampUtc = p.TimestampUtc,
+                    SentPerSecond = p.BytesSentPerSecond,
+                    ReceivedPerSecond = p.BytesReceivedPerSecond,
+                })
+                .ToList(),
+        };
+
+        return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(response, IpcChannel.Json));
     }
 
     /// <summary>

@@ -129,6 +129,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private IReadOnlyList<ChartPoint> _throughput = [];
 
+    /// <summary>Points for the selected application's own graph.</summary>
+    [ObservableProperty]
+    private IReadOnlyList<ChartPoint> _appThroughput = [];
+
     [ObservableProperty]
     private string _totalRate = "—";
 
@@ -144,16 +148,38 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>The rows actually shown, after the search filter.</summary>
     public ObservableCollection<AppRow> VisibleApps { get; } = [];
 
+    /// <summary>
+    /// Syncs <see cref="VisibleApps"/> to the current filter in place.
+    ///
+    /// Clearing and refilling would be simpler, but the grid drops its selection when the
+    /// selected row leaves the collection — and this runs on every two-second refresh, so
+    /// a user who clicked an application would lose the drill-down a moment later.
+    /// </summary>
     private void ApplyFilter()
     {
         var needle = SearchText.Trim();
+        var desired = Apps.Where(a => needle.Length == 0 || a.Matches(needle)).ToList();
 
-        VisibleApps.Clear();
-        foreach (var app in Apps)
+        for (var i = VisibleApps.Count - 1; i >= 0; i--)
         {
-            if (needle.Length == 0 || app.Matches(needle))
+            if (!desired.Contains(VisibleApps[i]))
             {
-                VisibleApps.Add(app);
+                VisibleApps.RemoveAt(i);
+            }
+        }
+
+        for (var i = 0; i < desired.Count; i++)
+        {
+            var app = desired[i];
+            var current = VisibleApps.IndexOf(app);
+
+            if (current < 0)
+            {
+                VisibleApps.Insert(Math.Min(i, VisibleApps.Count), app);
+            }
+            else if (current != i)
+            {
+                VisibleApps.Move(current, i);
             }
         }
     }
@@ -634,13 +660,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
         try
         {
-            var flows = await _client.ListFlowsAsync(app.Key, includeClosed: true, ct);
+            var response = await _client.ListFlowsAsync(app.Key, includeClosed: true, ct);
 
             Flows.Clear();
-            foreach (var flow in flows)
+            foreach (var flow in response.Flows)
             {
                 Flows.Add(new FlowRow(flow));
             }
+
+            AppThroughput = response.Throughput
+                .Select(s => new ChartPoint(s.TimestampUtc, s.SentPerSecond, s.ReceivedPerSecond))
+                .ToList();
         }
         catch (Exception ex) when (ex is ServiceUnavailableException or ServiceCallException
                                       or OperationCanceledException)
@@ -648,6 +678,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             // The outer refresh already reports connection problems; a failed drill-down
             // should not overwrite that with a second message.
             Flows.Clear();
+            AppThroughput = [];
         }
     }
 

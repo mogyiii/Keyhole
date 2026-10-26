@@ -19,11 +19,15 @@ public interface IByteCounterSource
     ByteCounts GetCounts(ConnectionKey key);
 
     /// <summary>
-    /// Peers observed for a UDP socket, keyed by local port. The UDP socket table carries
-    /// no remote endpoint at all, so without this UDP traffic — including QUIC, which is
-    /// how a modern browser moves most of its data — has no visible destination.
+    /// Peers observed for one process's UDP socket. The UDP socket table carries no remote
+    /// endpoint at all, so without this UDP traffic — including QUIC, which is how a modern
+    /// browser moves most of its data — has no visible destination.
+    ///
+    /// Keyed by process as well as port: two applications can hold the same local port
+    /// number on different sockets, and merging them would attribute one app's peers to
+    /// the other.
     /// </summary>
-    IReadOnlyList<UdpPeer> GetUdpPeers(int localPort);
+    IReadOnlyList<UdpPeer> GetUdpPeers(int processId, int localPort);
 }
 
 public readonly record struct ByteCounts(long Sent, long Received)
@@ -44,5 +48,5 @@ public sealed class NullByteCounterSource(string reason) : IByteCounterSource
 
     public ByteCounts GetCounts(ConnectionKey key) => ByteCounts.Zero;
 
-    public IReadOnlyList<UdpPeer> GetUdpPeers(int localPort) => [];
+    public IReadOnlyList<UdpPeer> GetUdpPeers(int processId, int localPort) => [];
 }

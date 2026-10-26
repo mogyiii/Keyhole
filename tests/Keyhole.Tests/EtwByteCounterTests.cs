@@ -69,7 +69,7 @@ public class EtwByteCounterTests(ITestOutputHelper output)
         var key = new ConnectionKey(TransportProtocol.Tcp, "10.0.0.1", 1234, "10.0.0.2", 443);
 
         Assert.Equal(ByteCounts.Zero, counter.GetCounts(key));
-        Assert.Empty(counter.GetUdpPeers(1234));
+        Assert.Empty(counter.GetUdpPeers(processId: 4321, localPort: 1234));
     }
 
     [Fact]

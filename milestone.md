@@ -3,7 +3,7 @@
 > Hálózati forgalom-elemző és -szabályozó .NET alkalmazás Windowsra.
 > Cél: a GlassWire átláthatósága + a Wireshark mélysége, kézi env-var kapcsolgatás nélkül.
 
-**Állapot:** M1–M7 kész ✅ — a tervezett mérföldkövek lezárva
+**Állapot:** M1–M7 kész ✅ + UDP-célpontok és per-app grafikon
 **Utolsó frissítés:** 2026-10-26
 
 ---
@@ -84,9 +84,10 @@
 - [x] **Hostnév-feloldás:** nem blokkoló reverse DNS, korlátozott párhuzamossággal és külön TTL-lel
 - [x] Aggregáció: app → kapcsolat hierarchia, folyamatonkénti csoportosítás
 - [x] Perzisztencia: SQLite forgalomtörténet + 30 napos retention
-- [ ] **Ikon-kinyerés** az `.exe`-kből — az M3 UI-hoz tartozik, ott logikusabb
+- [x] **UDP-célpontok ETW-ből** — a QUIC/HTTP3 forgalom már célponttal látszik
+- [x] **Ikon-kinyerés** az `.exe`-kből (M3-ban)
+- [x] **Élő sebesség** (byte/s) (M3-ban)
 - [ ] **GeoIP** (opcionális, offline MMDB) — elhalasztva, nem blokkol semmit
-- [ ] **Élő sebesség** (byte/s) — byte-számok kellenek hozzá, M3-ban a grafikonnal együtt
 
 **Done:** valódi forgalmon ellenőrizve — Brave, Claude Code, WinDefend, svchost-szolgáltatások és
 `sunshine` is helyes névvel, kiadóval, aláírás-állapottal és feloldott hostnévvel jelenik meg.
@@ -114,8 +115,8 @@ A drill-down kattintásra megadja a kapcsolatokat PID-enként. 86 teszt zöld.
 - [x] **App-nézet:** kapcsolat-tábla (távoli host, IP, port, proto, állapot, forgalom)
 - [x] **Dashboard:** össz-throughput grafikon fel/le bontásban
 - [x] Sötét/világos/automatikus téma, erőforrás-szótárakkal (nincs beégetett szín)
+- [x] **Per-app grafikon a drill-downban** — a kiválasztott app saját throughputja
 - [ ] Top appok / top hostok panel — a grafikon és a rendezhető lista már lefedi
-- [ ] Per-app grafikon a drill-downban — az adat megvan (`GetAppThroughput`), a vezérlő is
 
 **Done:** a fő workflow kattintható. Valódi forgalmon ellenőrizve, mindkét témában.
 
@@ -247,11 +248,24 @@ nem mértem.
 
 ---
 
+## Utómunka (a mérföldkövek után)
+
+| Mi | Állapot |
+|---|---|
+| **UDP-célpontok ETW-ből** | ✅ a UDP socketek peerenként külön flow-vá bomlanak |
+| **Per-app grafikon** | ✅ a drill-downban, a kapcsolatlista fölött |
+| `verify-elevated.ps1` lefuttatása | ⬜ rajtad a sor — emelt jog kell hozzá |
+
+### Megtalált és javított hiba
+
+| Hiba | Hatás | Javítás |
+|---|---|---|
+| A szűrt lista kétmásodpercenként újraépült | A kijelölés minden frissítéskor elveszett — rákattintottál egy appra, és 2 mp múlva üres lett a drill-down | Helyben szinkronizálás törlés-újratöltés helyett |
+
 ## Következő lépés
 
-A tervezett mérföldkövek lezárva. Ha folytatod, a sorrend amit javaslok:
-
-1. **`verify-elevated.ps1` lefuttatása** — ez zárja le a két nyitott ellenőrzést.
-2. **UDP-célpontok ETW-ből** — ez a legnagyobb valódi hiányosság a monitorozásban,
-   mert a QUIC/HTTP3 forgalom emiatt célpont nélkül látszik.
-3. **Per-app grafikon a drill-downban** — az adat és a vezérlő is kész, csak be kell kötni.
+1. **`scriptserify-elevated.ps1`** emelt jogon — ez zárja le a két nyitott ellenőrzést,
+   és egyúttal ez az első alkalom, hogy a UDP-célpontok valódi forgalmon látszanak
+   (ETW nélkül nincs peer, így a UDP most is láthatatlan marad).
+2. **GeoIP** — ország/ASN a távoli végpontokhoz, ha érdekel.
+3. **Top hostok panel** — melyik *célpont* kapja a legtöbb forgalmat, appoktól függetlenül.

@@ -161,18 +161,25 @@ public class FlowTrackerTests
     [Fact]
     public void Same_endpoints_on_different_protocols_are_distinct_flows()
     {
+        // The UDP side has to come from an expanded socket: the UDP table never reports a
+        // peer, so a row carrying one directly could not occur on a real machine.
         var reader = new FakeSocketReader
         {
-            Connections =
-            [
-                Connection(protocol: TransportProtocol.Tcp),
-                Connection(protocol: TransportProtocol.Udp),
-            ],
+            Connections = [Connection(protocol: TransportProtocol.Tcp), UdpSocket(localPort: 50000)],
         };
 
-        var result = TrackerOver(reader).Sample();
+        var bytes = new FakeByteCounter();
+        bytes.UdpPeers[(100, 50000)] = [new UdpPeer("93.184.216.34", 443, 10, 10)];
 
+        var result = new FlowTracker(
+            reader, new FakeProcessResolver(), new FakeHostnameResolver(), bytes).Sample();
+
+        // Identical four-tuples on TCP and UDP are two separate conversations, and the
+        // protocol is what keeps their keys apart.
         Assert.Equal(2, result.Opened.Count);
+        Assert.Equal(
+            [TransportProtocol.Tcp, TransportProtocol.Udp],
+            result.Opened.Select(f => f.Connection.Protocol).Order());
     }
 
     [Fact]
@@ -332,6 +339,126 @@ public class FlowTrackerTests
         Assert.Equal(5000, tracker.Snapshot().Single().BytesSent);
     }
 
+    // --- UDP peers ---
+
+    private static NetworkConnection UdpSocket(int pid = 100, int localPort = 55000) => new()
+    {
+        ProcessId = pid,
+        Protocol = TransportProtocol.Udp,
+        LocalAddress = IPAddress.Parse("192.168.1.10"),
+        LocalPort = localPort,
+        // The UDP socket table carries no peer at all; this is what it actually reports.
+        RemoteAddress = IPAddress.Any,
+        RemotePort = 0,
+        State = TcpConnectionState.None,
+    };
+
+    [Fact]
+    public void Udp_socket_becomes_one_flow_per_peer()
+    {
+        var reader = new FakeSocketReader { Connections = [UdpSocket()] };
+        var bytes = new FakeByteCounter();
+        bytes.UdpPeers[(100, 55000)] =
+        [
+            new UdpPeer("142.250.1.1", 443, 1000, 2000),
+            new UdpPeer("142.250.2.2", 443, 300, 400),
+        ];
+
+        var tracker = new FlowTracker(reader, new FakeProcessResolver(), new FakeHostnameResolver(), bytes);
+        var result = tracker.Sample();
+
+        // Without this a browser's QUIC traffic shows as a socket bound to 0.0.0.0 with
+        // no destination at all.
+        Assert.Equal(2, result.Opened.Count);
+        Assert.Equal(
+            ["142.250.1.1", "142.250.2.2"],
+            result.Opened.Select(f => f.Connection.RemoteAddress.ToString()).Order());
+    }
+
+    [Fact]
+    public void Udp_flow_carries_the_peers_byte_totals()
+    {
+        var reader = new FakeSocketReader { Connections = [UdpSocket()] };
+        var bytes = new FakeByteCounter();
+        bytes.UdpPeers[(100, 55000)] = [new UdpPeer("142.250.1.1", 443, 1000, 2000)];
+
+        var tracker = new FlowTracker(reader, new FakeProcessResolver(), new FakeHostnameResolver(), bytes);
+        tracker.Sample();
+
+        // UDP totals are counted per datagram and keyed by process, which a connection
+        // key cannot express, so they travel with the peer rather than being looked up.
+        var flow = tracker.Snapshot().Single();
+        Assert.Equal(1000, flow.BytesSent);
+        Assert.Equal(2000, flow.BytesReceived);
+    }
+
+    [Fact]
+    public void Udp_socket_with_no_observed_peers_is_not_tracked()
+    {
+        var reader = new FakeSocketReader { Connections = [UdpSocket()] };
+        var tracker = new FlowTracker(
+            reader, new FakeProcessResolver(), new FakeHostnameResolver(), new FakeByteCounter());
+
+        var result = tracker.Sample();
+
+        // Unelevated there is no ETW and so no peers. Showing a connection to 0.0.0.0
+        // would be worse than showing nothing.
+        Assert.Empty(result.Opened);
+    }
+
+    [Fact]
+    public void Udp_peers_are_not_shared_between_processes_on_the_same_port()
+    {
+        var reader = new FakeSocketReader
+        {
+            Connections = [UdpSocket(pid: 100, localPort: 55000), UdpSocket(pid: 200, localPort: 55000)],
+        };
+
+        var bytes = new FakeByteCounter();
+        bytes.UdpPeers[(100, 55000)] = [new UdpPeer("10.0.0.1", 443, 10, 10)];
+        bytes.UdpPeers[(200, 55000)] = [new UdpPeer("10.0.0.2", 443, 20, 20)];
+
+        var tracker = new FlowTracker(reader, new FakeProcessResolver(), new FakeHostnameResolver(), bytes);
+        tracker.Sample();
+
+        // Two applications can hold the same local port number on different sockets.
+        // Keying peers by port alone would attribute one app's traffic to the other.
+        var flows = tracker.Snapshot();
+        Assert.Equal(2, flows.Count);
+        Assert.Equal("10.0.0.1", flows.Single(f => f.Connection.ProcessId == 100).Connection.RemoteAddress.ToString());
+        Assert.Equal("10.0.0.2", flows.Single(f => f.Connection.ProcessId == 200).Connection.RemoteAddress.ToString());
+    }
+
+    [Fact]
+    public void A_new_udp_peer_appears_as_a_new_flow()
+    {
+        var reader = new FakeSocketReader { Connections = [UdpSocket()] };
+        var bytes = new FakeByteCounter();
+        bytes.UdpPeers[(100, 55000)] = [new UdpPeer("10.0.0.1", 443, 10, 10)];
+
+        var tracker = new FlowTracker(reader, new FakeProcessResolver(), new FakeHostnameResolver(), bytes);
+        tracker.Sample();
+
+        bytes.UdpPeers[(100, 55000)].Add(new UdpPeer("10.0.0.2", 443, 5, 5));
+        var second = tracker.Sample();
+
+        Assert.Single(second.Opened);
+        Assert.Equal("10.0.0.2", second.Opened[0].Connection.RemoteAddress.ToString());
+    }
+
+    [Fact]
+    public void Tcp_connections_are_unaffected_by_udp_expansion()
+    {
+        var reader = new FakeSocketReader { Connections = [Connection(), UdpSocket()] };
+        var bytes = new FakeByteCounter();
+
+        var tracker = new FlowTracker(reader, new FakeProcessResolver(), new FakeHostnameResolver(), bytes);
+        var result = tracker.Sample();
+
+        Assert.Single(result.Opened);
+        Assert.Equal(TransportProtocol.Tcp, result.Opened[0].Connection.Protocol);
+    }
+
     [Fact]
     public void Tracking_works_without_any_byte_counter()
     {
@@ -352,13 +479,17 @@ public class FlowTrackerTests
     {
         public Dictionary<ConnectionKey, ByteCounts> Counts { get; } = [];
 
+        /// <summary>Peers per (process, local port), as ETW would report them.</summary>
+        public Dictionary<(int Pid, int Port), List<UdpPeer>> UdpPeers { get; } = [];
+
         public bool IsRunning => true;
         public string? UnavailableReason => null;
 
         public ByteCounts GetCounts(ConnectionKey key) =>
             Counts.TryGetValue(key, out var counts) ? counts : ByteCounts.Zero;
 
-        public IReadOnlyList<UdpPeer> GetUdpPeers(int localPort) => [];
+        public IReadOnlyList<UdpPeer> GetUdpPeers(int processId, int localPort) =>
+            UdpPeers.TryGetValue((processId, localPort), out var peers) ? peers : [];
     }
 
     private sealed class FakeSocketReader : ISocketTableReader

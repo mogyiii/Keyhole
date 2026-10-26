@@ -144,6 +144,16 @@ public sealed record ListFlowsRequest
     public bool IncludeClosed { get; init; } = true;
 }
 
+/// <summary>
+/// Answer to <see cref="IpcMethods.ListFlows"/>: the application's connections together
+/// with its own throughput history, so the drill-down needs one round trip rather than two.
+/// </summary>
+public sealed record FlowsResponse
+{
+    public IReadOnlyList<FlowSummary> Flows { get; init; } = [];
+    public IReadOnlyList<ThroughputSample> Throughput { get; init; } = [];
+}
+
 /// <summary>One row of the application list.</summary>
 public sealed record AppSummary
 {

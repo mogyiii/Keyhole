@@ -100,7 +100,8 @@ Minden a `%ProgramData%\Keyhole` alatt:
 - **A blokkolás útvonal alapján működik.** A Windows tűzfal így működik. A Keyhole a
   szabály létrehozásakor elmenti az `.exe` SHA-256 hash-ét, és jelzi, ha a fájl utóbb
   megváltozott — de a szabály akkor is az útvonalra vonatkozik.
-- **UDP-célpontok nem látszanak.** A UDP socket-tábla egyszerűen nem tartalmaz távoli
-  végpontot. Ez érinti a QUIC/HTTP3 forgalmat.
+- **UDP-célpontokhoz admin kell.** A UDP socket-tábla nem tartalmaz távoli végpontot, ezért
+  a Keyhole az ETW-ből veszi őket — ami emelt jogot igényel. Enélkül a UDP (így a QUIC/HTTP3)
+  forgalom nem jelenik meg a listában.
 - **Antivírus-riasztás lehetséges.** Forgalom-figyelés, ETW-session és környezeti változó
   injektálás — aláíratlan buildnél ez együtt kiverheti a biztosítékot.

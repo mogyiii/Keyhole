@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -84,7 +85,7 @@ public sealed class FlowTracker(
         {
             var seen = new HashSet<ConnectionKey>(current.Count);
 
-            foreach (var connection in current)
+            foreach (var (connection, carriedCounts) in Expand(current))
             {
                 // Listeners are not traffic. Including them would fill the app list with
                 // every server socket on the machine, pointing at 0.0.0.0.
@@ -98,7 +99,7 @@ public sealed class FlowTracker(
 
                 if (_active.TryGetValue(key, out var existing))
                 {
-                    var counts = _bytes.GetCounts(key);
+                    var counts = carriedCounts ?? _bytes.GetCounts(key);
 
                     _active[key] = existing with
                     {
@@ -127,6 +128,8 @@ public sealed class FlowTracker(
                     continue;
                 }
 
+                var initial = carriedCounts ?? _bytes.GetCounts(key);
+
                 var flow = new TrackedFlow
                 {
                     Key = key,
@@ -135,6 +138,12 @@ public sealed class FlowTracker(
                     StartedUtc = now,
                     LastSeenUtc = now,
                     RemoteHostname = hostnames.TryGet(connection.RemoteAddress),
+
+                    // A UDP flow only becomes visible once ETW has seen traffic on it, so
+                    // it already has a total on the sample that creates it. Starting at
+                    // zero would discard everything observed before that sample.
+                    BytesSent = initial.Sent,
+                    BytesReceived = initial.Received,
                 };
 
                 _active[key] = flow;
@@ -154,6 +163,47 @@ public sealed class FlowTracker(
             return new SampleResult(opened, closed, _active.Count);
         }
     }
+
+    /// <summary>
+    /// Turns the raw socket table into things worth tracking.
+    ///
+    /// TCP rows pass through: the table already names both ends. UDP rows do not — the UDP
+    /// socket table has no peer column at all, so every row looks like a listener bound to
+    /// 0.0.0.0. Left alone that makes UDP traffic invisible, which matters because QUIC is
+    /// how a modern browser moves most of its data.
+    ///
+    /// ETW does record each datagram's peer, so a UDP socket becomes one flow per peer it
+    /// has actually talked to. Without ETW there are no peers to expand into and UDP stays
+    /// invisible — the same as before, and better than inventing a connection to 0.0.0.0.
+    /// </summary>
+    private IEnumerable<ExpandedConnection> Expand(IReadOnlyList<NetworkConnection> connections)
+    {
+        foreach (var connection in connections)
+        {
+            if (connection.Protocol != TransportProtocol.Udp)
+            {
+                // TCP byte totals are looked up by connection key, so none are carried here.
+                yield return new ExpandedConnection(connection, null);
+                continue;
+            }
+
+            foreach (var peer in _bytes.GetUdpPeers(connection.ProcessId, connection.LocalPort))
+            {
+                if (!IPAddress.TryParse(peer.RemoteAddress, out var remote))
+                {
+                    continue;
+                }
+
+                // UDP totals come with the peer: they are counted per datagram and keyed
+                // by process, which a connection key cannot express.
+                yield return new ExpandedConnection(
+                    connection with { RemoteAddress = remote, RemotePort = peer.RemotePort },
+                    new ByteCounts(peer.Sent, peer.Received));
+            }
+        }
+    }
+
+    private readonly record struct ExpandedConnection(NetworkConnection Connection, ByteCounts? Counts);
 
     private void PruneClosed(DateTimeOffset now)
     {
