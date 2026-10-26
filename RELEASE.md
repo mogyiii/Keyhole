@@ -38,9 +38,15 @@ UAC-prompt minden indításnál, és egy UI-hiba sem fut emelt jogosultsággal.
 ## Telepítés
 
 1. Csomagold ki a zipet egy tetszőleges mappába.
-2. Futtasd az **`Install Keyhole.cmd`** fájlt. UAC-promptot fog kérni — ez a service
-   telepítéséhez kell.
-3. Indítsd a UI-t: `app\Keyhole.exe`.
+2. Futtasd az **`Install Keyhole.cmd`** fájlt. UAC-promptot fog kérni.
+3. Indítsd a Keyhole-t a **Start menüből**.
+
+A telepítő mindkét felet felrakja: a service-t `%ProgramFiles%\Keyhole`-ba
+(LocalSystem, automatikus indítás), a UI-t pedig `%ProgramFiles%\Keyhole\app`-ba,
+Start menü bejegyzéssel. A UI **nem** emelt jogon fut.
+
+> Ne a build-mappából indítsd a UI-t: az a következő fordításnál zárolódik, és az
+> „indulás bejelentkezéskor” beállítás is egy múlékony útvonalra mutatna.
 
 Kézzel, emelt jogú PowerShellből ugyanez:
 
@@ -67,6 +73,8 @@ eldobható fájlra, ellenőrzi a Windows tűzfalban, majd eltakarítja).
 .\uninstall-service.ps1              # az adatok megmaradnak
 .\uninstall-service.ps1 -PurgeData   # az adatok is törlődnek (megerősítést kér)
 ```
+
+Eltávolítja a service-t, a UI-t, a Start menü bejegyzést és az automatikus indítást is.
 
 A tűzfalszabályokat a Keyhole a service leállításakor **nem** törli — ez szándékos: amit
 letiltottál, az letiltva marad. Ha mindet meg akarod szüntetni, előbb a UI „Blocked apps"

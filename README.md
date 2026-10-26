@@ -61,7 +61,8 @@ nincs privilegizált funkció. Az M2-től viszont emelt jogosultság kell.
 Emelt jogú PowerShellből:
 
 ```powershell
-.\scripts\install-service.ps1
+.\scripts\install-service.ps1              # service + UI + Start menü bejegyzés
+.\scripts\update-service.ps1               # service cseréje új buildre
 .\scripts\uninstall-service.ps1            # adatok megmaradnak
 .\scripts\uninstall-service.ps1 -PurgeData # adatok is törlődnek (megerősítést kér)
 ```
