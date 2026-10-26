@@ -40,7 +40,7 @@ function Invoke-Keyhole([string]$Method, [string]$ParamsJson) {
     try {
         $pipe.Connect(3000)
     } catch {
-        throw "Could not reach the Keyhole service. Start it elevated first: dotnet run --project src\Keyhole.Service"
+        throw "Could not reach the Keyhole service on \\.\pipe\keyhole.service."
     }
 
     $id = [guid]::NewGuid().ToString('n')
@@ -69,6 +69,77 @@ function Invoke-Keyhole([string]$Method, [string]$ParamsJson) {
     if ($parsed.error) { throw "$($parsed.error.code): $($parsed.error.message)" }
     return $parsed.result
 }
+
+# --- 0. Make sure a service is actually running ------------------------------
+
+function Test-KeyholePipe {
+    return [bool](@([System.IO.Directory]::GetFiles('\\.\pipe\')) -like '*keyhole.service*')
+}
+
+function Find-ServiceExe {
+    $repoRoot = Split-Path -Parent $PSScriptRoot
+    $candidates = @(
+        # Next to this script in an unpacked release.
+        (Join-Path $PSScriptRoot 'service\Keyhole.Service.exe'),
+        (Join-Path (Split-Path -Parent $PSScriptRoot) 'service\Keyhole.Service.exe'),
+        # Installed location.
+        (Join-Path $env:ProgramFiles 'Keyhole\Keyhole.Service.exe'),
+        # Developer builds.
+        (Join-Path $repoRoot 'src\Keyhole.Service\bin\Release\net10.0-windows\win-x64\Keyhole.Service.exe'),
+        (Join-Path $repoRoot 'src\Keyhole.Service\bin\Release\net10.0-windows\Keyhole.Service.exe'),
+        (Join-Path $repoRoot 'src\Keyhole.Service\bin\Debug\net10.0-windows\Keyhole.Service.exe')
+    )
+    # Newest wins rather than first match. Several of these can exist at once on a
+    # development machine, and verifying against a stale build would report on code
+    # that is no longer what anyone is running.
+    return $candidates |
+        Where-Object { Test-Path $_ } |
+        Get-Item |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1 -ExpandProperty FullName
+}
+
+$startedByUs = $null
+
+if (-not (Test-KeyholePipe)) {
+    Write-Host "`nNo service running - starting one" -ForegroundColor Cyan
+
+    # The point of this script is to exercise the elevated paths, and it is already
+    # elevated, so starting the service here is both safe and what the user wants.
+    # Requiring them to start it separately only invites running the checks against
+    # an unelevated service, which would report false failures.
+    $svc = Get-Service -Name 'Keyhole' -ErrorAction SilentlyContinue
+    if ($svc) {
+        if ($svc.Status -ne 'Running') {
+            Start-Service -Name 'Keyhole'
+            $svc.WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+        }
+        Write-Check $true "started the installed Keyhole service"
+    } else {
+        $exe = Find-ServiceExe
+        if (-not $exe) {
+            throw "Could not find Keyhole.Service.exe. Install the service first (install-service.ps1) or build the solution."
+        }
+
+        Write-Host "  using $exe"
+        $startedByUs = Start-Process -FilePath $exe -PassThru -WindowStyle Hidden
+
+        $deadline = (Get-Date).AddSeconds(30)
+        while ((Get-Date) -lt $deadline -and -not (Test-KeyholePipe)) {
+            Start-Sleep -Milliseconds 400
+        }
+        Write-Check (Test-KeyholePipe) "started the service from disk"
+    }
+
+    if (-not (Test-KeyholePipe)) {
+        throw 'The service did not come up. Check %ProgramData%\Keyhole\logs.'
+    }
+
+    # Give the first sampling pass time to land before asking about monitor state.
+    Start-Sleep -Seconds 3
+}
+
+try {
 
 # --- 1. Service state -------------------------------------------------------
 
@@ -170,3 +241,14 @@ finally {
 }
 
 Write-Host "`nDone.`n" -ForegroundColor Green
+
+}
+finally {
+    # Only stop what this script started. A service the user was already running -
+    # installed or launched by hand - is left exactly as it was found.
+    if ($startedByUs -and -not $startedByUs.HasExited) {
+        Write-Host "Stopping the service this script started." -ForegroundColor Cyan
+        $startedByUs.Kill()
+        $startedByUs.WaitForExit(5000) | Out-Null
+    }
+}

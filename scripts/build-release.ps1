@@ -7,7 +7,7 @@
     scripts, plus a zip of the same.
 
     The output is NOT code signed. Windows SmartScreen will warn the first time anyone
-    runs it, and Defender may hold it briefly — see RELEASE.md. Signing needs a code
+    runs it, and Defender may hold it briefly - see RELEASE.md. Signing needs a code
     signing certificate; pass -CertificatePath to enable it once one exists.
 
 .PARAMETER Version
