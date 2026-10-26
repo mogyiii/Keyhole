@@ -3,7 +3,7 @@
 > Hálózati forgalom-elemző és -szabályozó .NET alkalmazás Windowsra.
 > Cél: a GlassWire átláthatósága + a Wireshark mélysége, kézi env-var kapcsolgatás nélkül.
 
-**Állapot:** M1–M7 kész ✅ — telepítve, élesben ellenőrizve
+**Állapot:** M1–M7 kész ✅ — telepítve, élesben ellenőrizve. Következik: M8.
 **Utolsó frissítés:** 2026-10-26
 
 ---
@@ -50,10 +50,10 @@
 | ~~UI keretrendszer kiválasztása~~ | ✅ **Avalonia** (D1 lezárva) |
 | ~~ETW spike~~ | ✅ `EtwByteCounter` megvalósítva (D2) |
 | ~~WFP vs. `INetFwPolicy2`~~ | ✅ **INetFwPolicy2** — a szabályokat az OS birtokolja, túlélik az újraindítást (D3) |
-| Npcap jelenlét/telepítés kezelése | silent install vagy "Npcap szükséges" onboarding flow |
-| TLS-stratégia spike (keylog vs. MITM) | mérés: hány app fedhető le melyik úttal |
+| Npcap jelenlét/telepítés kezelése | ⏭ **M8-ba halasztva** — az M5 nem igényelte |
+| ~~TLS-stratégia (keylog vs. MITM)~~ | ✅ **keylog** (D5) — mérve: Chrome 6330 byte kulcsot írt, a Schannel-appok semmit |
 
-**Done, ha:** minden spike-ról van 1 bekezdés + működő kóddemó, és a *Nyitott döntések* szekcióban minden sor el van döntve.
+**Done:** minden döntés lezárva, mindegyik működő kóddal vagy méréssel alátámasztva.
 
 ---
 
@@ -93,9 +93,7 @@
 `sunshine` is helyes névvel, kiadóval, aláírás-állapottal és feloldott hostnévvel jelenik meg.
 A drill-down kattintásra megadja a kapcsolatokat PID-enként. 86 teszt zöld.
 
-> **Nem ellenőrzött:** az ETW byte-számlálás **valódi** működése. A session emelt jogot kér, a
-> fejlesztői környezet viszont nem az, így csak az hitelesített, hogy hiánya esetén a monitorozás
-> fut tovább, és a UI meg is indokolja. Az élesítés előtt le kell futtatni emelt jogon — lásd lentebb.
+> Az ETW byte-számlálás azóta **élesben is igazolt** — lásd az *Élesben ellenőrizve* szakaszt.
 
 ### Megtalált és javított hibák
 
@@ -156,15 +154,16 @@ az indulási egyeztetés és a teljes UI (Block gomb + betallózás + „Blocked
 
 ## M5 — TLS-láthatóság ✅
 
-> **Hatókör (a te döntésed):** kizárólag per-process keylog. Nincs Npcap, nincs MITM proxy,
-> nincs CA-telepítés a trust store-ba.
+> **Hatókör:** kizárólag per-process keylog — ez szünteti meg a `plan.txt`-ben leírt
+> kényelmetlenséget. A csomagrögzítés **M8-ba** került; a MITM proxy továbbra is kimarad
+> (CA-telepítést kérne a trust store-ba).
 
 - [x] „Launch app with key logging" — a Keyhole indítja az appot, `SSLKEYLOGFILE` **csak annak
       a folyamatnak** a környezetében
 - [x] Session-kezelés: minden capture külön mappa, saját keylog fájllal
 - [x] Capture fül: futó és lezárt session-ök, keylog mérete, mappa megnyitása
 - [x] Előzetes figyelmeztetés, ha az app Schannelt használ (nem fog kulcsot írni)
-- [ ] Beépített pcap-rögzítés és TLS-dekódolás a UI-ban — Npcap kellene hozzá, kihagyva
+- [ ] Beépített pcap-rögzítés és TLS-dekódolás a UI-ban — **átkerült M8-ba**
 - [ ] MITM proxy a Schannel-appokhoz — CA-telepítés kellene hozzá, kihagyva
 
 **Done — valódi méréssel igazolva:** a Keyhole által indított Chrome **6330 byte valódi TLS-titkot**
@@ -213,6 +212,53 @@ nem `dotnet run`-ból, hanem a kiadott exe-kből.
 
 ---
 
+## M8 — Npcap csomagrögzítés és beépített TLS-dekódolás
+
+> **Miért most:** az M5 megszüntette a kézi env-var kapcsolgatást, de a kört még mindig a
+> Wireshark zárja be. Ezzel a Keyhole maga rögzíti a forgalmat, és a saját keylogjával
+> azonnal vissza is fejti — egy helyen, külön eszköz nélkül.
+
+### Amit hoz
+
+A capture-session ma csak TLS-kulcsokat gyűjt. Ezzel mellé kerül a **pcap** is, és mivel a
+Keyhole mindkettőt birtokolja, a dekódolást el tudja végezni helyben: a UI-ban látszana,
+hogy a kiválasztott alkalmazás **mit** kért és mit kapott, nem csak kivel beszélt.
+
+### Feladatok
+
+- [ ] **Npcap-függőség kezelése** — jelenlét-ellenőrzés, érthető onboarding, ha hiányzik
+      (`npcap.sys` / `npcap` service), nem néma hiba
+- [ ] **SharpPcap/PacketDotNet** bekötés, adapter-választás
+- [ ] **Rögzítés a session idejére**, a célfolyamat forgalmára szűkítve
+- [ ] **pcapng írás** a session mappájába a keylog mellé
+- [ ] **TLS-dekódolás** a session keylogjával: TCP-összefűzés → TLS-rekordok → HTTP(S)
+- [ ] **Kérés/válasz nézet** a Capture fülön: metódus, URL, státusz, fejlécek, méret, idő
+- [ ] **„Open in Wireshark"** gomb, ami a pcap-ot és a keylogot együtt adja át
+
+### Amit előre tisztázni kell
+
+| Kérdés | Miért számít |
+|---|---|
+| **Npcap licenc** | Saját használatra más feltételek vonatkoznak, mint a továbbterjesztésre. Ha a Keyhole valaha kikerül a gépedről, az **aktuális** Npcap-licencet előbb el kell olvasni — ne ebből a táblázatból dolgozz. |
+| **Telepítés módja** | Néma telepítés a saját installerünkből, vagy „Npcap szükséges" üzenet és link? Az előbbi kényelmesebb, de harmadik fél driverét rakja fel a felhasználó gépére. |
+| **Rögzítés hatóköre** | Csak a capture-session alatt, csak a célfolyamat forgalmára. Teljes interfész-rögzítés minden app forgalmát lemezre írná — ez adatvédelmi kérdés, nem csak helykérdés. |
+| **Lemezigény** | Egy böngésző-session percek alatt több száz MB pcap. Kell felső korlát és rotáció. |
+
+### Hatókörön kívül
+
+A **MITM proxy** továbbra is kimarad, és ezzel a Schannelt használó alkalmazások sem
+kerülnek közelebb: azok nem írnak keylogot, így a pcap **velük is csak titkosított
+bájtokat** fog tartalmazni. Rájuk továbbra is csak a proxy-út működne — ahhoz viszont
+saját CA-t kellene a gépi trust store-ba telepíteni.
+
+**Done, ha:** egy böngésző-session után a Capture fülön látszanak a kérések és válaszok,
+a session mappájában pedig ott a pcap és a keylog, amit a Wireshark is megnyit.
+
+> ⚠️ A pcap a session teljes forgalmát tartalmazza, a keyloggal együtt visszafejthető
+> formában. A `captures/` mappa ettől még érzékenyebb lesz, mint ma.
+
+---
+
 ## Élesben ellenőrizve ✅
 
 A service telepítve (`Program Files\Keyhole`, LocalSystem, automatikus indítás), és valódi
@@ -255,12 +301,10 @@ prune be van kötve és tesztelt, de valós hosszú futás alatt nem mértem.
 
 | Terület | Miért |
 |---|---|
-| Npcap csomagrögzítés, beépített TLS-dekódolás | a te döntésed: csak keylog, külső függőség nélkül |
 | MITM proxy a Schannel-appokhoz | ugyanaz; CA-telepítés kellene a trust store-ba |
 | Kódaláírás | nincs tanúsítvány; a build-szkript készen áll rá |
 | MSI/MSIX installer | a zip + `Install Keyhole.cmd` egyelőre elég |
 | GeoIP (ország/ASN) | nem blokkol semmit, bármikor pótolható |
-| UDP távoli végpontok | a socket-tábla nem tartalmazza; ETW-ből kijönne, a felület (`GetUdpPeers`) megvan |
 | Szabályok import/export | nem blokkol semmit |
 
 ---
@@ -281,9 +325,10 @@ prune be van kötve és tesztelt, de valós hosszú futás alatt nem mértem.
 
 ## Következő lépés
 
-Minden tervezett funkció kész és élesben ellenőrizve. Ha folytatod:
+M1–M7 kész és élesben ellenőrizve. A következő:
 
-1. **Top hostok panel** — melyik *célpont* kapja a legtöbb forgalmat, appoktól függetlenül.
-   A 22 MB-ot küldő `178.237.23.32` például most csak az app alatt látszik.
-2. **GeoIP** — ország/ASN a távoli végpontokhoz (offline MMDB, nincs hálózati hívás).
-3. **Hosszú terhelési teszt** — az egyetlen méretlen terület.
+1. **M8 — Npcap csomagrögzítés és TLS-dekódolás.** Az Npcap licenc- és telepítés-kérdését
+   érdemes előbb eldönteni, mert az befolyásolja a többit.
+2. **Top hostok panel** — melyik *célpont* kapja a legtöbb forgalmat, appoktól függetlenül.
+3. **GeoIP** — ország/ASN a távoli végpontokhoz (offline MMDB, nincs hálózati hívás).
+4. **Hosszú terhelési teszt** — az egyetlen méretlen terület.
