@@ -52,6 +52,15 @@ public static class IpcMethods
 
     /// <summary>Enables or disables a rule without deleting it.</summary>
     public const string SetRuleEnabled = "set-rule-enabled";
+
+    /// <summary>Launches an application with TLS key logging scoped to it alone.</summary>
+    public const string StartCapture = "start-capture";
+
+    /// <summary>Ends a capture, leaving the launched application running.</summary>
+    public const string StopCapture = "stop-capture";
+
+    /// <summary>Every capture session, running and finished.</summary>
+    public const string ListCaptures = "list-captures";
 }
 
 public sealed record IpcRequest
@@ -182,6 +191,45 @@ public sealed record SetRuleEnabledRequest
 {
     public required long RuleId { get; init; }
     public required bool Enabled { get; init; }
+}
+
+/// <summary>Parameters for <see cref="IpcMethods.StartCapture"/>.</summary>
+public sealed record StartCaptureRequest
+{
+    public required string ExecutablePath { get; init; }
+
+    /// <summary>Command line passed through to the application.</summary>
+    public string? Arguments { get; init; }
+}
+
+/// <summary>Parameters for <see cref="IpcMethods.StopCapture"/>.</summary>
+public sealed record StopCaptureRequest
+{
+    public required long SessionId { get; init; }
+}
+
+/// <summary>One capture session as the UI sees it.</summary>
+public sealed record CaptureSummary
+{
+    public required long Id { get; init; }
+    public required string DisplayName { get; init; }
+    public required string ExecutablePath { get; init; }
+    public int? ProcessId { get; init; }
+    public required string Directory { get; init; }
+    public required string KeylogFile { get; init; }
+    public required DateTimeOffset StartedUtc { get; init; }
+    public DateTimeOffset? StoppedUtc { get; init; }
+    public required bool IsRunning { get; init; }
+
+    /// <summary>
+    /// Bytes written to the keylog. Zero on a running capture means the application is
+    /// not writing secrets — almost always because it uses Schannel rather than NSS or
+    /// OpenSSL, which is worth telling the user rather than leaving them waiting.
+    /// </summary>
+    public required long KeylogBytes { get; init; }
+
+    /// <summary>"likely" or "unknown" — whether this executable tends to honour the variable.</summary>
+    public required string KeylogSupport { get; init; }
 }
 
 /// <summary>One sample of machine-wide throughput, in bytes per second.</summary>

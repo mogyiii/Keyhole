@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using Avalonia;
 using Avalonia.Media.Imaging;
@@ -195,6 +197,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             ApplyFilter();
             await LoadRulesAsync(cts.Token);
             await LoadThroughputAsync(cts.Token);
+            await LoadCapturesAsync(cts.Token);
 
             State = ConnectionState.Connected;
             StatusMessage = $"{Apps.Count} apps, {ActiveConnections} active connections.";
@@ -390,6 +393,121 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    public ObservableCollection<CaptureRow> Captures { get; } = [];
+
+    /// <summary>
+    /// Launches an application with TLS key logging scoped to it. This is the whole point
+    /// of the feature: no machine-wide SSLKEYLOGFILE, nothing to remember to unset.
+    /// </summary>
+    [RelayCommand]
+    private async Task StartCaptureAsync()
+    {
+        if (PickExecutableAsync is null)
+        {
+            return;
+        }
+
+        var path = await PickExecutableAsync();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            var session = await _client.StartCaptureAsync(path, null, cts.Token);
+
+            LastActionMessage = session.KeylogSupport switch
+            {
+                "likely" => $"Capturing {session.DisplayName}. TLS keys go to {session.KeylogFile}.",
+
+                // Said up front rather than leaving the user watching a keylog that will
+                // never grow. Windows' own curl.exe is the classic case.
+                "unlikely" => $"Started {session.DisplayName}, but it uses Windows' TLS stack, " +
+                              "which ignores SSLKEYLOGFILE. No keys will be written.",
+
+                _ => $"Started {session.DisplayName}. If the keylog stays at zero bytes, " +
+                     "this application uses Windows' TLS stack and cannot be captured this way.",
+            };
+
+            await LoadCapturesAsync(cts.Token);
+        }
+        catch (ServiceCallException ex)
+        {
+            LastActionMessage = ex.Message;
+        }
+        catch (Exception ex) when (ex is ServiceUnavailableException or OperationCanceledException)
+        {
+            LastActionMessage = "The service did not respond; nothing was started.";
+        }
+    }
+
+    [RelayCommand]
+    private async Task StopCaptureAsync(CaptureRow? capture)
+    {
+        if (capture is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await _client.StopCaptureAsync(capture.Id, cts.Token);
+
+            LastActionMessage = $"Stopped capturing {capture.DisplayName}. The application is still running.";
+            await LoadCapturesAsync(cts.Token);
+        }
+        catch (Exception ex) when (ex is ServiceUnavailableException or ServiceCallException
+                                      or OperationCanceledException)
+        {
+            LastActionMessage = "The service did not respond; the capture was not stopped.";
+        }
+    }
+
+    /// <summary>Opens a session's folder so the pcap and keylog can be picked up by hand.</summary>
+    [RelayCommand]
+    private void OpenCaptureFolder(CaptureRow? capture)
+    {
+        if (capture is null || !Directory.Exists(capture.Directory))
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = capture.Directory,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception)
+        {
+            LastActionMessage = $"Could not open {capture.Directory}.";
+        }
+    }
+
+    private async Task LoadCapturesAsync(CancellationToken ct)
+    {
+        try
+        {
+            var sessions = await _client.ListCapturesAsync(ct);
+
+            Captures.Clear();
+            foreach (var session in sessions)
+            {
+                Captures.Add(new CaptureRow(session));
+            }
+        }
+        catch (Exception ex) when (ex is ServiceUnavailableException or ServiceCallException
+                                      or OperationCanceledException)
+        {
+            Captures.Clear();
+        }
+    }
+
     private async Task LoadThroughputAsync(CancellationToken ct)
     {
         try
@@ -560,6 +678,32 @@ public sealed class RuleRow(RuleSummary rule)
     };
 
     public bool HasWarning { get; } = rule.ExecutableState == "changed";
+}
+
+/// <summary>One capture session in the Capture tab.</summary>
+public sealed class CaptureRow(CaptureSummary session)
+{
+    public long Id { get; } = session.Id;
+    public string DisplayName { get; } = session.DisplayName;
+    public string Directory { get; } = session.Directory;
+    public bool IsRunning { get; } = session.IsRunning;
+    public string Status { get; } = session.IsRunning ? "Capturing" : "Finished";
+    public string Started { get; } = session.StartedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+    public string KeylogSize { get; } = Format.Bytes(session.KeylogBytes);
+
+    /// <summary>
+    /// Surfaced only when something is actually wrong. A running capture with an empty
+    /// keylog almost always means the application uses Schannel, which ignores the
+    /// variable — far more useful to say than to leave the user waiting.
+    /// </summary>
+    public string Note { get; } = session switch
+    {
+        { KeylogSupport: "unlikely" } => "uses Windows TLS, which ignores SSLKEYLOGFILE",
+        { IsRunning: true, KeylogBytes: 0, KeylogSupport: "unknown" } =>
+            "no keys yet — may use Windows TLS",
+        { IsRunning: false, KeylogBytes: 0 } => "no keys were written",
+        _ => "",
+    };
 }
 
 /// <summary>One connection in the drill-down table.</summary>

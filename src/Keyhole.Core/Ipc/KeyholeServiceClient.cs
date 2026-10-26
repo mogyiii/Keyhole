@@ -70,6 +70,25 @@ public sealed class KeyholeServiceClient(ILogger<KeyholeServiceClient>? logger =
     public Task UnblockAppAsync(long ruleId, CancellationToken ct = default) =>
         InvokeAsync<object>(IpcMethods.UnblockApp, new UnblockAppRequest { RuleId = ruleId }, ct);
 
+    public Task<IReadOnlyList<CaptureSummary>> ListCapturesAsync(CancellationToken ct = default) =>
+        InvokeAsync<IReadOnlyList<CaptureSummary>>(IpcMethods.ListCaptures, null, ct);
+
+    /// <summary>
+    /// Launches an application with TLS key logging scoped to it alone — no machine-wide
+    /// environment variable, nothing to unset afterwards.
+    /// </summary>
+    public Task<CaptureSummary> StartCaptureAsync(
+        string executablePath,
+        string? arguments = null,
+        CancellationToken ct = default) =>
+        InvokeAsync<CaptureSummary>(
+            IpcMethods.StartCapture,
+            new StartCaptureRequest { ExecutablePath = executablePath, Arguments = arguments },
+            ct);
+
+    public Task StopCaptureAsync(long sessionId, CancellationToken ct = default) =>
+        InvokeAsync<object>(IpcMethods.StopCapture, new StopCaptureRequest { SessionId = sessionId }, ct);
+
     public Task<RuleSummary> SetRuleEnabledAsync(long ruleId, bool enabled, CancellationToken ct = default) =>
         InvokeAsync<RuleSummary>(
             IpcMethods.SetRuleEnabled,

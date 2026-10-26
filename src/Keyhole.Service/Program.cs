@@ -1,5 +1,6 @@
 using Keyhole.Core;
 using Keyhole.Core.Blocking;
+using Keyhole.Core.Capture;
 using Keyhole.Core.Ipc;
 using Keyhole.Core.Monitoring;
 using Keyhole.Core.Storage;
@@ -76,6 +77,12 @@ try
     builder.Services.AddSingleton<IIpcMethodHandler, BlockAppHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, UnblockAppHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, SetRuleEnabledHandler>();
+
+    builder.Services.AddSingleton<SessionRepository>();
+    builder.Services.AddSingleton<CaptureService>();
+    builder.Services.AddSingleton<IIpcMethodHandler, ListCapturesHandler>();
+    builder.Services.AddSingleton<IIpcMethodHandler, StartCaptureHandler>();
+    builder.Services.AddSingleton<IIpcMethodHandler, StopCaptureHandler>();
     builder.Services.AddHostedService<IpcServer>();
 
     var host = builder.Build();
@@ -97,6 +104,14 @@ try
         Log.Warning(
             "Service is not elevated. Byte counting and blocking are unavailable; " +
             "connection monitoring still works.");
+    }
+
+    // Captures running when the service stopped have long since lost their process, so
+    // leaving them open would show finished captures as live forever.
+    var orphanedCaptures = host.Services.GetRequiredService<SessionRepository>().CloseOrphanedSessions();
+    if (orphanedCaptures > 0)
+    {
+        Log.Information("Closed {Count} capture sessions left open by a previous run.", orphanedCaptures);
     }
 
     // Keyhole and the firewall can drift apart while the service is not running: a rule

@@ -3,7 +3,7 @@
 > Hálózati forgalom-elemző és -szabályozó .NET alkalmazás Windowsra.
 > Cél: a GlassWire átláthatósága + a Wireshark mélysége, kézi env-var kapcsolgatás nélkül.
 
-**Állapot:** M3 + M4 kész ✅ — következik M5 (TLS-láthatóság)
+**Állapot:** M1–M5 kész ✅ — következik M6 (kiélesítés) és M7 (kiadás)
 **Utolsó frissítés:** 2026-10-26
 
 ---
@@ -153,34 +153,35 @@ az indulási egyeztetés és a teljes UI (Block gomb + betallózás + „Blocked
 
 ---
 
-## M5 — Capture és TLS-láthatóság 🎯 a `plan.txt` fő fájdalompontja
+## M5 — TLS-láthatóság ✅
 
-Két út, **nem** egymás alternatívái — egymást kiegészítik:
+> **Hatókör (a te döntésed):** kizárólag per-process keylog. Nincs Npcap, nincs MITM proxy,
+> nincs CA-telepítés a trust store-ba.
 
-### 5a. Per-process keylog (elsődleges út)
+- [x] „Launch app with key logging" — a Keyhole indítja az appot, `SSLKEYLOGFILE` **csak annak
+      a folyamatnak** a környezetében
+- [x] Session-kezelés: minden capture külön mappa, saját keylog fájllal
+- [x] Capture fül: futó és lezárt session-ök, keylog mérete, mappa megnyitása
+- [x] Előzetes figyelmeztetés, ha az app Schannelt használ (nem fog kulcsot írni)
+- [ ] Beépített pcap-rögzítés és TLS-dekódolás a UI-ban — Npcap kellene hozzá, kihagyva
+- [ ] MITM proxy a Schannel-appokhoz — CA-telepítés kellene hozzá, kihagyva
 
-A mostani kényelmetlenség gyökere, hogy a `SSLKEYLOGFILE` **globálisan** van beállítva. Megoldás: a Keyhole indítsa a célalkalmazást, és csak annak a processznek injektálja az env vart (`CreateProcess` saját environment blokkal).
+**Done — valódi méréssel igazolva:** a Keyhole által indított Chrome **6330 byte valódi TLS-titkot**
+írt a Wireshark által olvasott NSS formátumban (`CLIENT_HANDSHAKE_TRAFFIC_SECRET`…). Közben
+igazolva, hogy a változó **sehol máshol** nem létezik: sem a service-ben, sem User/Machine
+szinten, és egy párhuzamosan, normálisan indított folyamat sem látja.
 
-- [ ] "Launch with capture" funkció: app kiválasztása → Keyhole indítja, saját `SSLKEYLOGFILE`-lal egy session-mappába
-- [ ] Session-kezelés: minden capture külön keylog + pcap fájlpár
-- [ ] Npcap/SharpPcap capture a session idejére, PID-re szűkítve
-- [ ] Dekódolás: keylog + pcap → TLS-visszafejtés, HTTP(S) kérések/válaszok listája az UI-ban
-- [ ] "Open in Wireshark" gomb, ami átadja a pcap-ot és a keylogot is (a kézi beállítás teljesen eltűnik)
+**Használat Wiresharkkal:** a session mappájából a `sslkeys.log` megadható a
+*Preferences → Protocols → TLS → (Pre)-Master-Secret log filename* mezőben. A kézi
+env-var kapcsolgatás így teljesen megszűnik.
 
-> **Előny:** nincs cert-telepítés, nincs cert-pinning probléma, nem módosul a forgalom, globális env var nem kell.
-> **Korlát:** csak NSS/OpenSSL-alapú stackeknél működik (Chrome/Firefox/Electron/Node/curl) — Schannel-t használó .NET és natív Windows-appoknál nem.
+### Megtalált és javított hibák
 
-### 5b. MITM proxy (másodlagos út, a Schannel-appokra)
-
-- [ ] Beépített HTTP(S) proxy, saját CA-val (gépi trust store-ba telepítve, explicit user-engedéllyel)
-- [ ] Szelektív átirányítás: **ne** rendszer-szintű proxy legyen, hanem per-app (proxy env var / WFP redirect csak a kiválasztott PID-re)
-- [ ] Kérés/válasz böngésző UI-ban (header, body, timing)
-- [ ] Cert-pinninget használó appoknál felismerés + érthető hibaüzenet ("ez az app pinninget használ, használd az 5a utat")
-- [ ] CA-kulcs biztonságos tárolása (DPAPI) + egy kattintásos CA-eltávolítás
-
-> **Döntés M0-ban:** saját proxy implementáció vs. külső (mitmproxy wrap). Lásd *Nyitott döntések*.
-
-**Done, ha:** egy böngésző és egy .NET desktop app HTTPS-forgalma is olvashatóvá tehető az UI-ból, nulla kézi env-var vagy cert-művelet nélkül.
+| Hiba | Hatás | Javítás |
+|---|---|---|
+| Azonos másodpercben indított capture-ök | Közös mappa és közös keylog — két app titkai keverednek, egyik sem dekódolható | Ütközés esetén `-2`, `-3` utótag (igazolva: `cmd-2` … `cmd-7`) |
+| A heurisztika „likely"-t mondott a System32-es `curl.exe`-re | A felhasználó hiába várt volna kulcsokra; `curl --version` szerint **Schannel** | A Windows-mappa alatti binárisok „unlikely" besorolást kapnak |
+| A tesztek a valódi `ProgramData`-ba írtak | Minden futás szemetelt a gépi capture-mappába | A capture gyökér injektálható, a tesztek temp mappát használnak |
 
 ---
 
