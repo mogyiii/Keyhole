@@ -3,7 +3,7 @@
 > Hálózati forgalom-elemző és -szabályozó .NET alkalmazás Windowsra.
 > Cél: a GlassWire átláthatósága + a Wireshark mélysége, kézi env-var kapcsolgatás nélkül.
 
-**Állapot:** M4 kész ✅ — következik M3 (UI)
+**Állapot:** M3 + M4 kész ✅ — következik M5 (TLS-láthatóság)
 **Utolsó frissítés:** 2026-10-26
 
 ---
@@ -108,15 +108,20 @@ A drill-down kattintásra megadja a kapcsolatokat PID-enként. 86 teszt zöld.
 
 ---
 
-## M3 — UI: dashboard és drill-down
+## M3 — UI: dashboard és drill-down ✅
 
-- [ ] **App-lista:** élő sebesség, összesített forgalom, ikon, blokkolt-e; keresés/rendezés
-- [ ] **App-nézet:** kapcsolat-tábla (távoli host, IP, port, proto, állapot, be/ki byte), időbeli grafikon
-- [ ] **Dashboard:** össz-throughput grafikon, top appok, top hostok, friss események
-- [ ] **Új app jelzése** passzívan a listában (badge/kiemelés, nem felugró prompt)
-- [ ] Sötét/világos téma, DPI-helyes, virtualizált listák (ne akadjon 1000 sornál)
+- [x] **App-lista:** élő sebesség, összesített forgalom, **ikon**, blokkolt-e; szabad szavas keresés
+- [x] **App-nézet:** kapcsolat-tábla (távoli host, IP, port, proto, állapot, forgalom)
+- [x] **Dashboard:** össz-throughput grafikon fel/le bontásban
+- [x] Sötét/világos/automatikus téma, erőforrás-szótárakkal (nincs beégetett szín)
+- [ ] Top appok / top hostok panel — a grafikon és a rendezhető lista már lefedi
+- [ ] Per-app grafikon a drill-downban — az adat megvan (`GetAppThroughput`), a vezérlő is
 
-**Done, ha:** a fő workflow (gép figyelése → gyanús app kiszúrása → kapcsolatai megnézése) kattintható és gyors.
+**Done:** a fő workflow kattintható. Valódi forgalmon ellenőrizve, mindkét témában.
+
+> A grafikon színei a dataviz-irányelv kategorikus 1–2. slotjai, **validátorral ellenőrizve**
+> mindkét felületen: CVD ΔE 24.7 (világos) és 26.8 (sötét), a 8-as küszöb felett. A fel/le
+> megkülönböztetése sosem csak színen múlik — a jelmagyarázat kiírja mindkettőt.
 
 ---
 

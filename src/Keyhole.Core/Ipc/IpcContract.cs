@@ -38,6 +38,9 @@ public static class IpcMethods
     /// <summary>Connections for one application, for the drill-down view.</summary>
     public const string ListFlows = "list-flows";
 
+    /// <summary>Machine-wide throughput history for the dashboard graph.</summary>
+    public const string GetThroughput = "get-throughput";
+
     /// <summary>Every block rule the user has created.</summary>
     public const string ListRules = "list-rules";
 
@@ -146,6 +149,15 @@ public sealed record AppSummary
     public required DateTimeOffset LastActiveUtc { get; init; }
     public IReadOnlyList<string> RecentRemoteHosts { get; init; } = [];
     public IReadOnlyList<int> ProcessIds { get; init; } = [];
+
+    /// <summary>Current upload rate in bytes per second.</summary>
+    public double SentRate { get; init; }
+
+    /// <summary>Current download rate in bytes per second.</summary>
+    public double ReceivedRate { get; init; }
+
+    /// <summary>Id of the block rule covering this app, or null when it is not blocked.</summary>
+    public long? BlockedByRuleId { get; init; }
 }
 
 /// <summary>Parameters for <see cref="IpcMethods.BlockApp"/>.</summary>
@@ -170,6 +182,14 @@ public sealed record SetRuleEnabledRequest
 {
     public required long RuleId { get; init; }
     public required bool Enabled { get; init; }
+}
+
+/// <summary>One sample of machine-wide throughput, in bytes per second.</summary>
+public sealed record ThroughputSample
+{
+    public required DateTimeOffset TimestampUtc { get; init; }
+    public required double SentPerSecond { get; init; }
+    public required double ReceivedPerSecond { get; init; }
 }
 
 /// <summary>One block rule as the UI sees it.</summary>

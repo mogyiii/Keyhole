@@ -3,9 +3,14 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
+using Avalonia;
+using Avalonia.Media.Imaging;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Keyhole.App.Controls;
 using Keyhole.Core.Ipc;
 
 namespace Keyhole.App.ViewModels;
@@ -68,9 +73,87 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public bool CanBlock => BlockingWarning is null;
 
-    partial void OnBlockingWarningChanged(string? value) => OnPropertyChanged(nameof(CanBlock));
+    /// <summary>
+    /// One line covering whatever is unavailable. Byte counting and blocking both fail
+    /// for the same reason — no elevation — so two separate strips would say the same
+    /// thing twice and cost a third of the list's vertical space.
+    /// </summary>
+    public string? CapabilityWarning
+    {
+        get
+        {
+            var missing = new List<string>(2);
+            if (ByteCountingWarning is not null)
+            {
+                missing.Add("byte counting");
+            }
+
+            if (BlockingWarning is not null)
+            {
+                missing.Add("blocking");
+            }
+
+            if (missing.Count == 0)
+            {
+                return null;
+            }
+
+            // Both reasons currently say "needs administrator rights". If they ever
+            // diverge, fall back to showing them in full rather than inventing a summary.
+            var sameCause = ByteCountingWarning is null || BlockingWarning is null ||
+                            (ByteCountingWarning.Contains("administrator", StringComparison.OrdinalIgnoreCase) &&
+                             BlockingWarning.Contains("administrator", StringComparison.OrdinalIgnoreCase));
+
+            return sameCause
+                ? $"The service is not elevated, so {string.Join(" and ", missing)} are unavailable. " +
+                  "Connection monitoring still works."
+                : $"{ByteCountingWarning} {BlockingWarning}";
+        }
+    }
+
+    partial void OnBlockingWarningChanged(string? value)
+    {
+        OnPropertyChanged(nameof(CanBlock));
+        OnPropertyChanged(nameof(CapabilityWarning));
+    }
+
+    partial void OnByteCountingWarningChanged(string? value) =>
+        OnPropertyChanged(nameof(CapabilityWarning));
 
     public ObservableCollection<RuleRow> Rules { get; } = [];
+
+    /// <summary>Points for the dashboard graph.</summary>
+    [ObservableProperty]
+    private IReadOnlyList<ChartPoint> _throughput = [];
+
+    [ObservableProperty]
+    private string _totalRate = "—";
+
+    /// <summary>
+    /// Free-text filter over the app list. Applied in the view model rather than the
+    /// service: the list is small and filtering locally keeps typing responsive.
+    /// </summary>
+    [ObservableProperty]
+    private string _searchText = "";
+
+    partial void OnSearchTextChanged(string value) => ApplyFilter();
+
+    /// <summary>The rows actually shown, after the search filter.</summary>
+    public ObservableCollection<AppRow> VisibleApps { get; } = [];
+
+    private void ApplyFilter()
+    {
+        var needle = SearchText.Trim();
+
+        VisibleApps.Clear();
+        foreach (var app in Apps)
+        {
+            if (needle.Length == 0 || app.Matches(needle))
+            {
+                VisibleApps.Add(app);
+            }
+        }
+    }
 
     [ObservableProperty]
     private bool _isBusy;
@@ -109,7 +192,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
             var apps = await _client.ListAppsAsync(cts.Token);
             MergeApps(apps);
+            ApplyFilter();
             await LoadRulesAsync(cts.Token);
+            await LoadThroughputAsync(cts.Token);
 
             State = ConnectionState.Connected;
             StatusMessage = $"{Apps.Count} apps, {ActiveConnections} active connections.";
@@ -201,6 +286,29 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// Blocks the selected application. Only reachable from a deliberate click; Keyhole
     /// never creates a rule on its own.
     /// </summary>
+    /// <summary>
+    /// Cycles the window between following the OS setting, light and dark. Defaults to
+    /// following the OS so Keyhole matches the rest of the desktop out of the box.
+    /// </summary>
+    [RelayCommand]
+    private void CycleTheme()
+    {
+        if (Application.Current is not { } app)
+        {
+            return;
+        }
+
+        (app.RequestedThemeVariant, ThemeLabel) = app.RequestedThemeVariant switch
+        {
+            var v when v == ThemeVariant.Dark => (ThemeVariant.Light, "Light"),
+            var v when v == ThemeVariant.Light => (ThemeVariant.Default, "Auto"),
+            _ => (ThemeVariant.Dark, "Dark"),
+        };
+    }
+
+    [ObservableProperty]
+    private string _themeLabel = "Auto";
+
     [RelayCommand]
     private async Task BlockSelectedAsync()
     {
@@ -282,6 +390,30 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    private async Task LoadThroughputAsync(CancellationToken ct)
+    {
+        try
+        {
+            var samples = await _client.GetThroughputAsync(ct);
+
+            Throughput = samples
+                .Select(s => new ChartPoint(s.TimestampUtc, s.SentPerSecond, s.ReceivedPerSecond))
+                .ToList();
+
+            var latest = samples.Count > 0 ? samples[^1] : null;
+            TotalRate = latest is null
+                ? "—"
+                : $"↑ {ThroughputChart.FormatRate(latest.SentPerSecond)}   " +
+                  $"↓ {ThroughputChart.FormatRate(latest.ReceivedPerSecond)}";
+        }
+        catch (Exception ex) when (ex is ServiceUnavailableException or ServiceCallException
+                                      or OperationCanceledException)
+        {
+            Throughput = [];
+            TotalRate = "—";
+        }
+    }
+
     private async Task LoadRulesAsync(CancellationToken ct)
     {
         try
@@ -360,7 +492,19 @@ public sealed partial class AppRow : ObservableObject
     [ObservableProperty] private int _activeConnections;
     [ObservableProperty] private int _totalConnections;
     [ObservableProperty] private string _traffic = "";
+    [ObservableProperty] private string _rate = "";
     [ObservableProperty] private string _remoteHosts = "";
+    [ObservableProperty] private Bitmap? _icon;
+
+    /// <summary>
+    /// Shown as text, not only as a colour or icon, so the blocked state survives
+    /// colour-vision deficiency and a monochrome screenshot.
+    /// </summary>
+    [ObservableProperty] private string _blockedLabel = "";
+
+    [ObservableProperty] private bool _isBlocked;
+
+    public long? BlockedByRuleId { get; private set; }
 
     public void Update(AppSummary summary)
     {
@@ -372,7 +516,26 @@ public sealed partial class AppRow : ObservableObject
         TotalConnections = summary.TotalConnections;
         Traffic = Format.Traffic(summary.BytesSent, summary.BytesReceived);
         RemoteHosts = string.Join(", ", summary.RecentRemoteHosts);
+
+        Rate = summary.SentRate < 1 && summary.ReceivedRate < 1
+            ? "—"
+            : $"↑{ThroughputChart.FormatRate(summary.SentRate)} ↓{ThroughputChart.FormatRate(summary.ReceivedRate)}";
+
+        BlockedByRuleId = summary.BlockedByRuleId;
+        IsBlocked = summary.BlockedByRuleId is not null;
+        BlockedLabel = IsBlocked ? "Blocked" : "";
+
+        // Loaded once per row: the shell lookup is cached, but building an Avalonia
+        // bitmap on every two-second refresh would still churn.
+        Icon ??= IconLoader.Load(summary.ExecutablePath);
     }
+
+    /// <summary>Matches the search box against the fields a user would type.</summary>
+    public bool Matches(string needle) =>
+        DisplayName.Contains(needle, StringComparison.OrdinalIgnoreCase) ||
+        (Publisher?.Contains(needle, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        (ExecutablePath?.Contains(needle, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        RemoteHosts.Contains(needle, StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>One block rule in the rules list.</summary>

@@ -3,36 +3,37 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:Keyhole.App.ViewModels"
+        xmlns:controls="using:Keyhole.App.Controls"
         mc:Ignorable="d"
         x:Class="Keyhole.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Keyhole"
         Width="1100" Height="680"
         MinWidth="820" MinHeight="520"
-        Background="#11131A">
+        Background="{DynamicResource WindowBackground}">
 
   <Window.Styles>
     <Style Selector="TextBlock.label">
-      <Setter Property="Foreground" Value="#7D8694" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
       <Setter Property="FontSize" Value="11" />
     </Style>
     <Style Selector="TextBlock.heading">
-      <Setter Property="Foreground" Value="#E6EAF0" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
       <Setter Property="FontSize" Value="13" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="#181B24" />
+      <Setter Property="Background" Value="{DynamicResource CardBackground}" />
       <Setter Property="CornerRadius" Value="10" />
-      <Setter Property="BorderBrush" Value="#242935" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="DataGrid">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="GridLinesVisibility" Value="Horizontal" />
-      <Setter Property="HorizontalGridLinesBrush" Value="#20242F" />
+      <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource GridLine}" />
       <Setter Property="RowBackground" Value="Transparent" />
-      <Setter Property="Foreground" Value="#C3CAD5" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
     </Style>
   </Window.Styles>
 
@@ -41,8 +42,8 @@
     <!-- Header -->
     <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
       <StackPanel Grid.Column="0" Spacing="2">
-        <TextBlock Text="Keyhole" FontSize="22" FontWeight="Bold" Foreground="#E6EAF0" />
-        <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#7D8694" />
+        <TextBlock Text="Keyhole" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" />
+        <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
       </StackPanel>
 
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
@@ -52,6 +53,8 @@
                    Fill="{Binding State, Converter={StaticResource StateToBrush}}" />
           <TextBlock Text="{Binding State}" Classes="heading" VerticalAlignment="Center" />
         </StackPanel>
+        <Button Content="{Binding ThemeLabel}" Command="{Binding CycleThemeCommand}"
+                Padding="12,6" ToolTip.Tip="Switch between auto, light and dark" />
         <Button Content="Block an app…" Command="{Binding BrowseAndBlockCommand}"
                 IsEnabled="{Binding CanBlock}" Padding="14,6" />
         <Button Content="Refresh" Command="{Binding RefreshCommand}"
@@ -59,45 +62,69 @@
       </StackPanel>
     </Grid>
 
-    <!-- Warning strips: explain missing capability instead of leaving it unexplained -->
-    <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">
-      <Border Classes="card" Padding="14,10"
-              Background="#2A2113" BorderBrush="#4A3A1B"
-              IsVisible="{Binding ByteCountingWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
-        <StackPanel Orientation="Horizontal" Spacing="10">
-          <TextBlock Text="⚠" FontSize="14" Foreground="#D29922" VerticalAlignment="Center" />
-          <TextBlock Text="{Binding ByteCountingWarning}" TextWrapping="Wrap"
-                     Foreground="#E3B341" FontSize="12" VerticalAlignment="Center" />
-        </StackPanel>
-      </Border>
+    <!-- One strip for everything unavailable: the causes are the same, and two boxes
+         would repeat themselves while costing the list a third of its height. -->
+    <Border Grid.Row="1" Classes="card" Padding="12,7" Margin="0,12,0,0"
+            Background="{DynamicResource WarningBackground}" BorderBrush="{DynamicResource WarningBorder}"
+            IsVisible="{Binding CapabilityWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <StackPanel Orientation="Horizontal" Spacing="9">
+        <TextBlock Text="⚠" FontSize="13" Foreground="{DynamicResource WarningIcon}" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding CapabilityWarning}" TextWrapping="Wrap"
+                   Foreground="{DynamicResource WarningText}" FontSize="12" VerticalAlignment="Center" />
+      </StackPanel>
+    </Border>
 
-      <Border Classes="card" Padding="14,10"
-              Background="#2A2113" BorderBrush="#4A3A1B"
-              IsVisible="{Binding BlockingWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
-        <StackPanel Orientation="Horizontal" Spacing="10">
-          <TextBlock Text="⚠" FontSize="14" Foreground="#D29922" VerticalAlignment="Center" />
-          <TextBlock Text="{Binding BlockingWarning}" TextWrapping="Wrap"
-                     Foreground="#E3B341" FontSize="12" VerticalAlignment="Center" />
-        </StackPanel>
-      </Border>
-    </StackPanel>
+    <!-- Dashboard graph, app list, drill-down -->
+    <!-- The app list is the primary view, so it gets the larger share. -->
+    <Grid Grid.Row="2" RowDefinitions="Auto,3*,Auto,2*" Margin="0,12,0,0">
 
-    <!-- App list over connection drill-down -->
-    <Grid Grid.Row="2" RowDefinitions="2*,Auto,3*" Margin="0,14,0,0">
-
-      <Border Grid.Row="0" Classes="card">
+      <Border Grid.Row="0" Classes="card" Height="128" Margin="0,0,0,8">
         <Grid RowDefinitions="Auto,*">
-          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="16,12,16,8">
+          <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="16,10,16,4">
+            <TextBlock Grid.Column="0" Text="Throughput" Classes="heading" VerticalAlignment="Center" />
+
+            <!-- Legend: two series must never be identified by colour alone. -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="14"
+                        Margin="18,0,0,0" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Rectangle Width="10" Height="2" Fill="{DynamicResource SeriesUpload}" VerticalAlignment="Center" />
+                <TextBlock Text="Upload" Classes="label" VerticalAlignment="Center" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Rectangle Width="10" Height="2" Fill="{DynamicResource SeriesDownload}" VerticalAlignment="Center" />
+                <TextBlock Text="Download" Classes="label" VerticalAlignment="Center" />
+              </StackPanel>
+            </StackPanel>
+
+            <TextBlock Grid.Column="2" Text="{Binding TotalRate}" Classes="heading"
+                       VerticalAlignment="Center" />
+          </Grid>
+
+          <controls:ThroughputChart Grid.Row="1" Points="{Binding Throughput}" Margin="8,0,8,6"
+                                    SentBrush="{DynamicResource SeriesUpload}"
+                                    ReceivedBrush="{DynamicResource SeriesDownload}"
+                                    GridBrush="{DynamicResource GridLine}"
+                                    TextBrush="{DynamicResource TextMuted}" />
+        </Grid>
+      </Border>
+
+
+      <Border Grid.Row="1" Classes="card">
+        <Grid RowDefinitions="Auto,*">
+          <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="16,12,16,8">
             <TextBlock Grid.Column="0" Text="Applications" Classes="heading" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Content="Block selected"
+            <TextBox Grid.Column="1" Text="{Binding SearchText}"
+                     PlaceholderText="Search apps, publishers, hosts…"
+                     Margin="16,0" MaxWidth="320" HorizontalAlignment="Left"
+                     FontSize="12" Padding="8,4" />
+            <Button Grid.Column="2" Content="Block selected"
                     Command="{Binding BlockSelectedCommand}"
                     IsEnabled="{Binding CanBlock}"
                     Padding="12,4" FontSize="12" />
           </Grid>
 
-
           <DataGrid Grid.Row="1"
-                    ItemsSource="{Binding Apps}"
+                    ItemsSource="{Binding VisibleApps}"
                     SelectedItem="{Binding SelectedApp}"
                     AutoGenerateColumns="False"
                     IsReadOnly="True"
@@ -105,22 +132,32 @@
                     HeadersVisibility="Column"
                     Margin="6,0,6,6">
             <DataGrid.Columns>
+              <DataGridTemplateColumn Header="" Width="36">
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Image Source="{Binding Icon}" Width="18" Height="18"
+                           Margin="6,2" VerticalAlignment="Center" />
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
               <DataGridTextColumn Header="Application" Binding="{Binding DisplayName}" Width="2*" />
-              <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}" Width="1.4*" />
-              <DataGridTextColumn Header="Signature" Binding="{Binding Signature}" Width="90" />
-              <DataGridTextColumn Header="Active" Binding="{Binding ActiveConnections}" Width="70" />
-              <DataGridTextColumn Header="Total" Binding="{Binding TotalConnections}" Width="70" />
-              <DataGridTextColumn Header="Traffic" Binding="{Binding Traffic}" Width="150" />
-              <DataGridTextColumn Header="Recent hosts" Binding="{Binding RemoteHosts}" Width="2.5*" />
+              <!-- Blocked state is a word, not just a colour, so it survives CVD and greyscale. -->
+              <DataGridTextColumn Header="" Binding="{Binding BlockedLabel}" Width="74" />
+              <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}" Width="1.3*" />
+              <DataGridTextColumn Header="Signature" Binding="{Binding Signature}" Width="100" />
+              <DataGridTextColumn Header="Conns" Binding="{Binding ActiveConnections}" Width="75" />
+              <DataGridTextColumn Header="Rate" Binding="{Binding Rate}" Width="165" />
+              <DataGridTextColumn Header="Total" Binding="{Binding Traffic}" Width="150" />
+              <DataGridTextColumn Header="Recent hosts" Binding="{Binding RemoteHosts}" Width="2*" />
             </DataGrid.Columns>
           </DataGrid>
         </Grid>
       </Border>
 
-      <GridSplitter Grid.Row="1" Height="8" Background="Transparent"
+      <GridSplitter Grid.Row="2" Height="8" Background="Transparent"
                     HorizontalAlignment="Stretch" ResizeDirection="Rows" />
 
-      <Border Grid.Row="2" Classes="card">
+      <Border Grid.Row="3" Classes="card">
         <TabControl Margin="8,4,8,8">
 
           <TabItem>

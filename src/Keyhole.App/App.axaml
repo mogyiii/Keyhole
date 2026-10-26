@@ -2,10 +2,53 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:conv="using:Keyhole.App.Converters"
              x:Class="Keyhole.App.App"
-             RequestedThemeVariant="Dark">
+             RequestedThemeVariant="Default">
 
   <Application.Resources>
-    <conv:ConnectionStateToBrushConverter x:Key="StateToBrush" />
+    <!-- Both variants are chosen, not derived. The dark steps are the same hues
+         restepped for a dark surface; flipping the light values automatically would
+         wash the chart series out against it. -->
+    <ResourceDictionary>
+      <conv:ConnectionStateToBrushConverter x:Key="StateToBrush" />
+
+      <ResourceDictionary.ThemeDictionaries>
+
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="WindowBackground" Color="#11131A" />
+          <SolidColorBrush x:Key="CardBackground" Color="#181B24" />
+          <SolidColorBrush x:Key="CardBorder" Color="#242935" />
+          <SolidColorBrush x:Key="TextPrimary" Color="#E6EAF0" />
+          <SolidColorBrush x:Key="TextSecondary" Color="#C3CAD5" />
+          <SolidColorBrush x:Key="TextMuted" Color="#7D8694" />
+          <SolidColorBrush x:Key="GridLine" Color="#20242F" />
+          <SolidColorBrush x:Key="WarningBackground" Color="#2A2113" />
+          <SolidColorBrush x:Key="WarningBorder" Color="#4A3A1B" />
+          <SolidColorBrush x:Key="WarningText" Color="#E3B341" />
+          <SolidColorBrush x:Key="WarningIcon" Color="#D29922" />
+          <!-- Categorical slots 1 and 2, validated against #181B24. -->
+          <SolidColorBrush x:Key="SeriesUpload" Color="#3987e5" />
+          <SolidColorBrush x:Key="SeriesDownload" Color="#d95926" />
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="WindowBackground" Color="#F4F5F7" />
+          <SolidColorBrush x:Key="CardBackground" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="CardBorder" Color="#DFE2E8" />
+          <SolidColorBrush x:Key="TextPrimary" Color="#15181D" />
+          <SolidColorBrush x:Key="TextSecondary" Color="#3A4049" />
+          <SolidColorBrush x:Key="TextMuted" Color="#6B7280" />
+          <SolidColorBrush x:Key="GridLine" Color="#E6E8EC" />
+          <SolidColorBrush x:Key="WarningBackground" Color="#FFF8E6" />
+          <SolidColorBrush x:Key="WarningBorder" Color="#E8D9A8" />
+          <SolidColorBrush x:Key="WarningText" Color="#7A5A05" />
+          <SolidColorBrush x:Key="WarningIcon" Color="#B8860B" />
+          <!-- Categorical slots 1 and 2, validated against #FFFFFF. -->
+          <SolidColorBrush x:Key="SeriesUpload" Color="#2a78d6" />
+          <SolidColorBrush x:Key="SeriesDownload" Color="#eb6834" />
+        </ResourceDictionary>
+
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
   </Application.Resources>
 
   <Application.Styles>

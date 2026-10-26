@@ -34,6 +34,20 @@ public sealed class FlowTracker(
     private static readonly TimeSpan ClosedRetention = TimeSpan.FromMinutes(5);
     private const int MaxRecentlyClosed = 2000;
 
+    /// <summary>How much of the throughput graph is kept.</summary>
+    public static TimeSpan GraphWindow => TimeSpan.FromMinutes(5);
+
+    /// <summary>Machine-wide throughput, for the dashboard graph.</summary>
+    public ThroughputHistory TotalThroughput { get; } = new(GraphWindow);
+
+    /// <summary>
+    /// Per-application rates, keyed the same way <see cref="GetAppActivity"/> groups.
+    /// Entries are dropped when an app stops appearing, so a long session does not
+    /// accumulate history for every program that ever opened a socket.
+    /// </summary>
+    private readonly Dictionary<string, ThroughputHistory> _appThroughput =
+        new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Flows observed since the tracker started, active and recently closed.</summary>
     public IReadOnlyList<TrackedFlow> Snapshot()
     {
@@ -161,23 +175,29 @@ public sealed class FlowTracker(
     public IReadOnlyList<AppActivity> GetAppActivity()
     {
         var flows = Snapshot();
+        var now = DateTimeOffset.UtcNow;
 
-        return flows
+        var activity = flows
             .GroupBy(f => f.Process.ExecutablePath ?? f.Process.DisplayName, StringComparer.OrdinalIgnoreCase)
             .Select(group =>
             {
                 var identity = group.First().Process;
+                var sent = group.Sum(f => f.BytesSent);
+                var received = group.Sum(f => f.BytesReceived);
+                var rate = RecordAppThroughput(group.Key, sent, received, now);
 
                 return new AppActivity
                 {
+                    SentRate = rate.BytesSentPerSecond,
+                    ReceivedRate = rate.BytesReceivedPerSecond,
                     DisplayName = identity.DisplayName,
                     ExecutablePath = identity.ExecutablePath,
                     Publisher = identity.Publisher,
                     Signature = identity.Signature,
                     ActiveConnections = group.Count(f => f.IsActive),
                     TotalConnections = group.Count(),
-                    BytesSent = group.Sum(f => f.BytesSent),
-                    BytesReceived = group.Sum(f => f.BytesReceived),
+                    BytesSent = sent,
+                    BytesReceived = received,
                     FirstSeenUtc = group.Min(f => f.StartedUtc),
                     LastActiveUtc = group.Max(f => f.LastSeenUtc),
                     RecentRemoteHosts = group
@@ -196,6 +216,51 @@ public sealed class FlowTracker(
             })
             .OrderByDescending(a => a.LastActiveUtc)
             .ToList();
+
+        TotalThroughput.Record(
+            activity.Sum(a => a.BytesSent),
+            activity.Sum(a => a.BytesReceived),
+            now);
+
+        PruneAppThroughput(activity.Select(a => a.ExecutablePath ?? a.DisplayName));
+
+        return activity;
+    }
+
+    private ThroughputPoint RecordAppThroughput(string key, long sent, long received, DateTimeOffset now)
+    {
+        lock (_gate)
+        {
+            if (!_appThroughput.TryGetValue(key, out var history))
+            {
+                history = new ThroughputHistory(GraphWindow);
+                _appThroughput[key] = history;
+            }
+
+            return history.Record(sent, received, now);
+        }
+    }
+
+    private void PruneAppThroughput(IEnumerable<string> liveKeys)
+    {
+        var live = liveKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        lock (_gate)
+        {
+            foreach (var key in _appThroughput.Keys.Where(k => !live.Contains(k)).ToList())
+            {
+                _appThroughput.Remove(key);
+            }
+        }
+    }
+
+    /// <summary>Throughput history for one application, for its detail graph.</summary>
+    public IReadOnlyList<ThroughputPoint> GetAppThroughput(string key)
+    {
+        lock (_gate)
+        {
+            return _appThroughput.TryGetValue(key, out var history) ? history.Snapshot() : [];
+        }
     }
 }
 

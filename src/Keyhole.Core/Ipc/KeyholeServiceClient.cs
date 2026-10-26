@@ -49,6 +49,10 @@ public sealed class KeyholeServiceClient(ILogger<KeyholeServiceClient>? logger =
             new ListFlowsRequest { Application = application, IncludeClosed = includeClosed },
             ct);
 
+    /// <summary>Machine-wide throughput history for the dashboard graph.</summary>
+    public Task<IReadOnlyList<ThroughputSample>> GetThroughputAsync(CancellationToken ct = default) =>
+        InvokeAsync<IReadOnlyList<ThroughputSample>>(IpcMethods.GetThroughput, null, ct);
+
     public Task<IReadOnlyList<RuleSummary>> ListRulesAsync(CancellationToken ct = default) =>
         InvokeAsync<IReadOnlyList<RuleSummary>>(IpcMethods.ListRules, null, ct);
 

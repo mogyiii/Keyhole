@@ -32,6 +32,12 @@ public sealed record TrackedFlow
 /// </summary>
 public sealed record AppActivity
 {
+    /// <summary>Current upload rate in bytes per second.</summary>
+    public double SentRate { get; init; }
+
+    /// <summary>Current download rate in bytes per second.</summary>
+    public double ReceivedRate { get; init; }
+
     public required string DisplayName { get; init; }
     public string? ExecutablePath { get; init; }
     public string? Publisher { get; init; }

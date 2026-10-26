@@ -1,23 +1,41 @@
 using System.Text.Json;
+using Keyhole.Core.Blocking;
 using Keyhole.Core.Ipc;
 using Keyhole.Core.Monitoring;
 
 namespace Keyhole.Service.Ipc;
 
 /// <summary>Answers <see cref="IpcMethods.ListApps"/> with the aggregated application list.</summary>
-public sealed class ListAppsHandler(FlowTracker tracker) : IIpcMethodHandler
+public sealed class ListAppsHandler(FlowTracker tracker, BlockingService? blocking = null) : IIpcMethodHandler
 {
     public string Method => IpcMethods.ListApps;
 
     public Task<JsonElement?> HandleAsync(JsonElement? parameters, CancellationToken ct)
     {
-        var apps = tracker.GetAppActivity().Select(ToSummary).ToList();
+        // Joined here rather than in the UI so the list and the rules cannot disagree
+        // about what is blocked.
+        var rulesByPath = blocking is null
+            ? []
+            : blocking.ListRules()
+                .GroupBy(r => r.ExecutablePath, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+
+        var apps = tracker.GetAppActivity()
+            .Select(a => ToSummary(a) with
+            {
+                BlockedByRuleId = a.ExecutablePath is { } path && rulesByPath.TryGetValue(path, out var id)
+                    ? id
+                    : null,
+            })
+            .ToList();
 
         return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(apps, IpcChannel.Json));
     }
 
     internal static AppSummary ToSummary(AppActivity activity) => new()
     {
+        SentRate = activity.SentRate,
+        ReceivedRate = activity.ReceivedRate,
         DisplayName = activity.DisplayName,
         ExecutablePath = activity.ExecutablePath,
         Publisher = activity.Publisher,
@@ -30,6 +48,26 @@ public sealed class ListAppsHandler(FlowTracker tracker) : IIpcMethodHandler
         RecentRemoteHosts = activity.RecentRemoteHosts,
         ProcessIds = activity.ProcessIds,
     };
+}
+
+/// <summary>Answers <see cref="IpcMethods.GetThroughput"/> with the machine-wide graph history.</summary>
+public sealed class GetThroughputHandler(FlowTracker tracker) : IIpcMethodHandler
+{
+    public string Method => IpcMethods.GetThroughput;
+
+    public Task<JsonElement?> HandleAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var samples = tracker.TotalThroughput.Snapshot()
+            .Select(p => new ThroughputSample
+            {
+                TimestampUtc = p.TimestampUtc,
+                SentPerSecond = p.BytesSentPerSecond,
+                ReceivedPerSecond = p.BytesReceivedPerSecond,
+            })
+            .ToList();
+
+        return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(samples, IpcChannel.Json));
+    }
 }
 
 /// <summary>Answers <see cref="IpcMethods.ListFlows"/> with one application's connections.</summary>
