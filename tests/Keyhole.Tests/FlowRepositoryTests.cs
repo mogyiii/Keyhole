@@ -171,6 +171,78 @@ public class FlowRepositoryTests : IDisposable
     }
 
     [Fact]
+    public void Byte_totals_for_open_flows_reach_the_database()
+    {
+        // The regression this guards: totals were written only when a flow closed, so a
+        // connection still open when the service stopped lost its traffic from history.
+        // On a real machine this meant 16 of 16 TCP flows recorded as zero bytes.
+        var flow = Flow();
+        _repository.RecordSample(new SampleResult([flow], [], 1));
+
+        Assert.Equal(0, ReadBytes().sent);
+
+        _repository.UpdateActiveBytes([flow with { BytesSent = 4096, BytesReceived = 8192 }]);
+
+        var (sent, received) = ReadBytes();
+        Assert.Equal(4096, sent);
+        Assert.Equal(8192, received);
+    }
+
+    [Fact]
+    public void Flushing_updates_the_open_row_rather_than_inserting()
+    {
+        var flow = Flow();
+        _repository.RecordSample(new SampleResult([flow], [], 1));
+
+        _repository.UpdateActiveBytes([flow with { BytesSent = 100 }]);
+        _repository.UpdateActiveBytes([flow with { BytesSent = 900 }]);
+
+        Assert.Equal(1, _repository.CountFlows());
+        Assert.Equal(900, ReadBytes().sent);
+    }
+
+    [Fact]
+    public void Flushing_leaves_closed_flows_alone()
+    {
+        var flow = Flow();
+        _repository.RecordSample(new SampleResult([flow], [], 1));
+        _repository.RecordSample(new SampleResult(
+            [], [flow with { EndedUtc = DateTimeOffset.UtcNow, BytesSent = 777 }], 0));
+
+        // A closed row holds its final figures; a stale in-memory copy must not revise them.
+        _repository.UpdateActiveBytes([flow with { BytesSent = 1 }]);
+
+        Assert.Equal(777, ReadBytes().sent);
+    }
+
+    [Fact]
+    public void Flushing_skips_flows_with_nothing_to_report()
+    {
+        var flow = Flow();
+        _repository.RecordSample(new SampleResult([flow], [], 1));
+
+        // Most flows carry no bytes at all without ETW; writing them back every interval
+        // would be pure disk traffic.
+        Assert.Equal(0, _repository.UpdateActiveBytes([flow]));
+        Assert.Equal(0, _repository.UpdateActiveBytes([]));
+    }
+
+    [Fact]
+    public void Flushed_totals_survive_the_flow_being_orphaned()
+    {
+        var flow = Flow();
+        _repository.RecordSample(new SampleResult([flow], [], 1));
+        _repository.UpdateActiveBytes([flow with { BytesSent = 5000, BytesReceived = 6000 }]);
+
+        // Simulates the service being stopped and started again.
+        _repository.CloseOrphanedFlows();
+
+        var (sent, received) = ReadBytes();
+        Assert.Equal(5000, sent);
+        Assert.Equal(6000, received);
+    }
+
+    [Fact]
     public void Orphaned_flows_are_closed_on_restart()
     {
         var a = Flow(localPort: 50000);
@@ -258,6 +330,15 @@ public class FlowRepositoryTests : IDisposable
         using var command = connection.CreateCommand();
         command.CommandText = sql;
         return Convert.ToInt64(command.ExecuteScalar());
+    }
+
+    private (long sent, long received) ReadBytes()
+    {
+        using var connection = _database.OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT bytes_sent, bytes_received FROM flows LIMIT 1;";
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? (reader.GetInt64(0), reader.GetInt64(1)) : (0, 0);
     }
 
     private string? ReadEndedUtc()

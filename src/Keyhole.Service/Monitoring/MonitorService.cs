@@ -24,7 +24,17 @@ public sealed class MonitorService(
 
     private static readonly TimeSpan PruneInterval = TimeSpan.FromHours(6);
 
+    /// <summary>
+    /// How often open flows have their byte totals written to history.
+    ///
+    /// Far slower than the sampling interval on purpose: this only protects history
+    /// against an abrupt shutdown, and the live view reads the tracker directly. At two
+    /// seconds it would turn monitoring into a disk-bound workload for no benefit.
+    /// </summary>
+    private static readonly TimeSpan ByteFlushInterval = TimeSpan.FromSeconds(30);
+
     private DateTimeOffset _lastPruneUtc = DateTimeOffset.UtcNow;
+    private DateTimeOffset _lastByteFlushUtc = DateTimeOffset.UtcNow;
 
     /// <summary>Set once the first sample lands, so status can report real state.</summary>
     public bool HasSampled { get; private set; }
@@ -77,6 +87,7 @@ public sealed class MonitorService(
                         sample.Opened.Count, sample.Closed.Count, sample.ActiveCount);
                 }
 
+                MaybeFlushBytes();
                 MaybePrune();
             }
             catch (Exception ex)
@@ -96,6 +107,22 @@ public sealed class MonitorService(
         }
 
         logger.LogInformation("Flow monitoring stopped.");
+    }
+
+    private void MaybeFlushBytes()
+    {
+        if (DateTimeOffset.UtcNow - _lastByteFlushUtc < ByteFlushInterval)
+        {
+            return;
+        }
+
+        _lastByteFlushUtc = DateTimeOffset.UtcNow;
+
+        var updated = repository.UpdateActiveBytes(tracker.Snapshot());
+        if (updated > 0)
+        {
+            logger.LogDebug("Flushed byte totals for {Count} open flows.", updated);
+        }
     }
 
     private void MaybePrune()

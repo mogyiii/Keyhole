@@ -1,5 +1,6 @@
 using Keyhole.Core.Monitoring;
 using Microsoft.Data.Sqlite;
+using System.Data;
 
 namespace Keyhole.Core.Storage;
 
@@ -150,6 +151,81 @@ public sealed class FlowRepository(KeyholeDatabase database)
         update.Parameters.AddWithValue("$remotePort", flow.Connection.RemotePort);
 
         update.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Writes current byte totals for flows that are still open, and returns how many rows
+    /// were updated.
+    ///
+    /// Without this a flow's totals only ever reach the database when it closes, so any
+    /// connection still open when the service stops loses its traffic from history
+    /// permanently — and long-lived connections are exactly the ones worth looking back at.
+    /// Called on a slow interval rather than every sample: this is history, and the live
+    /// view reads the tracker directly.
+    /// </summary>
+    public int UpdateActiveBytes(IEnumerable<TrackedFlow> flows)
+    {
+        var active = flows.Where(f => f.IsActive && (f.BytesSent > 0 || f.BytesReceived > 0)).ToList();
+        if (active.Count == 0)
+        {
+            return 0;
+        }
+
+        using var connection = database.OpenConnection();
+        using var transaction = connection.BeginTransaction();
+
+        using var update = connection.CreateCommand();
+        update.Transaction = transaction;
+
+        // Matches the most recent still-open row for this four-tuple, the same way
+        // CloseFlow does, so the two cannot disagree about which row a flow owns.
+        update.CommandText = """
+            UPDATE flows
+               SET bytes_sent      = $sent,
+                   bytes_received  = $received,
+                   last_active_utc = $lastActive,
+                   remote_hostname = COALESCE($hostname, remote_hostname)
+             WHERE id = (
+                 SELECT id FROM flows
+                  WHERE pid = $pid
+                    AND protocol = $protocol
+                    AND local_port = $localPort
+                    AND remote_address = $remoteAddr
+                    AND remote_port = $remotePort
+                    AND ended_utc IS NULL
+                  ORDER BY started_utc DESC
+                  LIMIT 1
+             );
+            """;
+
+        var sent = update.Parameters.Add("$sent", SqliteType.Integer);
+        var received = update.Parameters.Add("$received", SqliteType.Integer);
+        var lastActive = update.Parameters.Add("$lastActive", SqliteType.Text);
+        var hostname = update.Parameters.Add("$hostname", SqliteType.Text);
+        var pid = update.Parameters.Add("$pid", SqliteType.Integer);
+        var protocol = update.Parameters.Add("$protocol", SqliteType.Text);
+        var localPort = update.Parameters.Add("$localPort", SqliteType.Integer);
+        var remoteAddr = update.Parameters.Add("$remoteAddr", SqliteType.Text);
+        var remotePort = update.Parameters.Add("$remotePort", SqliteType.Integer);
+
+        var updated = 0;
+        foreach (var flow in active)
+        {
+            sent.Value = flow.BytesSent;
+            received.Value = flow.BytesReceived;
+            lastActive.Value = flow.LastSeenUtc.ToString("O");
+            hostname.Value = (object?)flow.RemoteHostname ?? DBNull.Value;
+            pid.Value = flow.Connection.ProcessId;
+            protocol.Value = flow.Connection.Protocol.ToString().ToUpperInvariant();
+            localPort.Value = flow.Connection.LocalPort;
+            remoteAddr.Value = flow.Connection.RemoteAddress.ToString();
+            remotePort.Value = flow.Connection.RemotePort;
+
+            updated += update.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return updated;
     }
 
     /// <summary>

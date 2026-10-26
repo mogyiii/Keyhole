@@ -213,24 +213,33 @@ nem `dotnet run`-ból, hanem a kiadott exe-kből.
 
 ---
 
-## Ami ellenőrizetlen maradt
+## Emelt jogú ellenőrzés — lefutott ✅
 
-Egy helyen kell emelt jogon futtatni, egy paranccsal:
+`scriptserify-elevated.ps1`, 2026-10-26 14:41, **14/14 PASS**:
 
-```powershell
-.\scriptserify-elevated.ps1     # emelt jogú PowerShellből, futó service mellett
-```
+| Mi | Eredmény |
+|---|---|
+| Service elevated, monitorozás fut | ✅ 15 kapcsolat |
+| **ETW byte-számlálás** | ✅ 5 app valódi forgalommal (pl. `nvcontainer.exe` up 7720 / down 772) |
+| **Tűzfalszabály írása** | ✅ létrehozva, a Windows tűzfalban visszaellenőrizve (Block / Outbound / enabled) |
+| SHA-256 rögzítés | ✅ `match` |
+| Takarítás | ✅ a szabály a tűzfalból és a Keyhole-ból is eltűnt |
 
-Ez lefedi azt a kettőt, amit a fejlesztői környezet (nem emelt jogú) nem engedett igazolni:
+**UDP-célpontok** (ezt a szkript nem méri, az adatbázisból ellenőriztem): 31 UDP flow valódi
+célponttal, köztük `Dnscache (svchost) → 8.8.8.8:53`. A javítás előtt ezek mind láthatatlanok voltak.
 
-| Mi | Miért nem ellenőriztem | Mit igazoltam helyette |
-|---|---|---|
-| **ETW byte-számlálás** valódi működése | a trace session adminjogot kér | hiánya esetén a monitorozás fut tovább, és a UI megindokolja |
-| **Tűzfalszabály írása** | a szabályírás adminjogot kér | a COM-réteg olvasásra működik; minden írás érthető indokkal utasít el |
+### Amit ez az ellenőrzés hozott elő
 
-Ezen kívül **nem futtattam hosszú terhelési tesztet** (memória-szivárgás, WAL-növekedés
-napokon át). A retention és a prune be van kötve és tesztelt, de valós hosszú futás alatt
-nem mértem.
+A zöld pipák mellett az adatbázis egy hibát árult el: **a 16 TCP flow mind nullával** szerepelt,
+miközben a 31 UDP mind byte-számokkal. Ok: a byte-totálok csak *lezáráskor* íródtak ki, így
+minden kapcsolat, ami nyitva volt a service leállásakor, elvesztette a forgalmát a történetből —
+épp a hosszú életű, érdekes kapcsolatok. Javítva: 30 másodpercenként kiíródnak az aktív flow-k
+számai (5 teszt fedi). **Élesben még nem igazolt** — a következő emelt jogú futásnál lesz látható.
+
+### Továbbra is méretlen
+
+**Hosszú terhelési teszt** (memória-szivárgás, WAL-növekedés napokon át). A retention és a prune
+be van kötve és tesztelt, de valós hosszú futás alatt nem mértem.
 
 ---
 
