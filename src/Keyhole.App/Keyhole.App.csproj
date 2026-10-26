@@ -6,6 +6,7 @@
     <AssemblyName>Keyhole</AssemblyName>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\keyhole.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
@@ -16,6 +17,11 @@
     <PackageReference Include="Avalonia.Controls.DataGrid" />
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Needed at runtime for the tray icon, not only as the exe icon. -->
+    <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
 
   <ItemGroup>

@@ -7,7 +7,7 @@ Wireshark mélységét egy helyen, kézi `SSLKEYLOGFILE` kapcsolgatás nélkül.
 
 A részletes terv és az aktuális állapot: [`milestone.md`](milestone.md).
 
-**Jelenleg:** M2 kész — a monitorozás működik. Blokkolás (M4) és a kész UI (M3) még hátravan.
+**Jelenleg:** M1–M7 kész. Telepítés és korlátok: [`RELEASE.md`](RELEASE.md).
 
 ## Felépítés
 
@@ -27,6 +27,17 @@ keretekkel. A pipe ACL-je az interaktív felhasználóra és adminokra korlátoz
 A forgalom-monitorozás, a tűzfalszabály-írás és a packet capture mind adminjogot kér. Ha maga az UI
 futna elevated módban, minden UI-bug admin-jogosultságú lenne, és minden indításnál UAC-prompt jönne.
 Így az UI a bejelentkezett userként fut, és csak kéréseket küld.
+
+## Mit tud
+
+- **Ki beszél a hálózaton** — alkalmazásonként, ikonnal, kiadóval, aláírás-állapottal,
+  feloldott hostnevekkel; svchost esetén a benne futó szolgáltatás nevével
+- **Mit csinál egy app** — kapcsolatonkénti lebontás PID-del, állapottal, forgalommal
+- **Élő throughput grafikon** fel/le bontásban
+- **Blokkolás egy kattintással** — Windows tűzfalszabály, ami túléli az újraindítást;
+  a szabály a létrehozáskori SHA-256-ot is elmenti, és jelez, ha a bináris megváltozott
+- **TLS-láthatóság kézi env-var nélkül** — a Keyhole indítja az appot `SSLKEYLOGFILE`-lal,
+  ami **csak annak a folyamatnak** a környezetében létezik; a keylog mehet a Wiresharkba
 
 ## Fejlesztés
 

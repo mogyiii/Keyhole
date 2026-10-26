@@ -51,6 +51,22 @@
     </ResourceDictionary>
   </Application.Resources>
 
+  <!-- Keyhole keeps monitoring after the window closes, so the tray is how the user
+       gets back to it rather than having to find the executable again. -->
+  <TrayIcon.Icons>
+    <TrayIcons>
+      <TrayIcon Icon="/Assets/keyhole.ico" ToolTipText="Keyhole — network monitor">
+        <TrayIcon.Menu>
+          <NativeMenu>
+            <NativeMenuItem Header="Open Keyhole" Click="OnTrayOpen" />
+            <NativeMenuItemSeparator />
+            <NativeMenuItem Header="Exit" Click="OnTrayExit" />
+          </NativeMenu>
+        </TrayIcon.Menu>
+      </TrayIcon>
+    </TrayIcons>
+  </TrayIcon.Icons>
+
   <Application.Styles>
     <FluentTheme />
     <!-- DataGrid ships its theme separately; without this the control renders unstyled. -->

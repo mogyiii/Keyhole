@@ -13,6 +13,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Keyhole.App.Controls;
+using Keyhole.Core;
 using Keyhole.Core.Ipc;
 
 namespace Keyhole.App.ViewModels;
@@ -307,10 +308,82 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             var v when v == ThemeVariant.Light => (ThemeVariant.Default, "Auto"),
             _ => (ThemeVariant.Dark, "Dark"),
         };
+
+        PersistSettings();
     }
 
     [ObservableProperty]
     private string _themeLabel = "Auto";
+
+    private KeyholeSettings _settings = new();
+
+    /// <summary>Set once at startup by the application, before the window is shown.</summary>
+    public KeyholeSettings Settings
+    {
+        get => _settings;
+        set
+        {
+            _settings = value;
+            ThemeLabel = value.Theme switch
+            {
+                "light" => "Light",
+                "dark" => "Dark",
+                _ => "Auto",
+            };
+
+            MinimiseToTray = value.MinimiseToTray;
+            ResolveHostnames = value.ResolveHostnames;
+            RetentionDays = value.RetentionDays;
+            StartWithWindows = StartupRegistration.IsEnabled();
+        }
+    }
+
+    [ObservableProperty] private bool _minimiseToTray = true;
+    [ObservableProperty] private bool _resolveHostnames = true;
+    [ObservableProperty] private int _retentionDays = 30;
+    [ObservableProperty] private bool _startWithWindows;
+
+    [ObservableProperty] private string? _settingsMessage;
+
+    partial void OnMinimiseToTrayChanged(bool value) => PersistSettings();
+
+    partial void OnResolveHostnamesChanged(bool value) => PersistSettings();
+
+    partial void OnRetentionDaysChanged(int value) => PersistSettings();
+
+    partial void OnStartWithWindowsChanged(bool value)
+    {
+        if (!StartupRegistration.SetEnabled(value))
+        {
+            SettingsMessage = "Could not update the sign-in startup entry.";
+            return;
+        }
+
+        PersistSettings();
+    }
+
+    private void PersistSettings()
+    {
+        _settings = _settings with
+        {
+            MinimiseToTray = MinimiseToTray,
+            ResolveHostnames = ResolveHostnames,
+            RetentionDays = RetentionDays,
+            StartWithWindows = StartWithWindows,
+            Theme = ThemeLabel.ToLowerInvariant(),
+        };
+
+        try
+        {
+            SettingsStore.Save(_settings);
+            SettingsMessage = null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Settings are a convenience; failing to save one must not break the session.
+            SettingsMessage = $"Could not save settings: {ex.Message}";
+        }
+    }
 
     [RelayCommand]
     private async Task BlockSelectedAsync()

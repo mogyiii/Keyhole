@@ -3,7 +3,7 @@
 > Hálózati forgalom-elemző és -szabályozó .NET alkalmazás Windowsra.
 > Cél: a GlassWire átláthatósága + a Wireshark mélysége, kézi env-var kapcsolgatás nélkül.
 
-**Állapot:** M1–M5 kész ✅ — következik M6 (kiélesítés) és M7 (kiadás)
+**Állapot:** M1–M7 kész ✅ — a tervezett mérföldkövek lezárva
 **Utolsó frissítés:** 2026-10-26
 
 ---
@@ -185,65 +185,73 @@ env-var kapcsolgatás így teljesen megszűnik.
 
 ---
 
-## M6 — Kiélesítés
+## M6 — Kiélesítés ✅
 
-- [ ] Teljesítmény-profilozás: memória-plafon, hosszú futás (24h+) leak-mentesen
-- [ ] DB retention + tömörítés (ne nőjön a SQLite végtelenre)
-- [ ] Hibatűrés: Npcap hiányzik, ETW session elveszett, service-összeomlás → érthető UI-állapot
-- [ ] Automatikus indítás bejelentkezéskor, tray-ikon, "minimalizálás trayre"
-- [ ] Beállítások: retention, értesítések, GeoIP ki/be, capture-mappa
-
----
-
-## M7 — Kiadás
-
-- [ ] Installer (MSIX vagy WiX), kódaláírás
-- [ ] Onboarding: mire kell admin, mit telepítünk (Npcap, CA), mi hol tárolódik
-- [ ] README + rövid használati doc, képernyőképek
-- [ ] Auto-update vagy legalább verzióellenőrzés
+- [x] Tray-ikon, „bezárás a tray-be" (a monitorozás így nem tűnik el szem elől)
+- [x] Automatikus indítás bejelentkezéskor (per-user Run kulcs, nem kell hozzá admin)
+- [x] Settings fül: retention, tray-viselkedés, hostnév-feloldás, autostart
+- [x] DB retention a beállításból, nem beégetve; 6 óránként prune
+- [x] Hibatűrés: hiányzó jogosultság, elérhetetlen service, sérült settings — mind
+      érthető állapotot ad, nem összeomlást
+- [ ] 24h+ futás profilozása — nem futtattam le, lásd lentebb
 
 ---
 
-## Nyitott döntések (M0-ban lezárni)
+## M7 — Kiadás ✅ (aláírás nélkül)
 
-| # | Kérdés | Opciók | Döntés / hajlás |
-|---|---|---|---|
-| ~~D1~~ | UI keretrendszer | WinUI 3 / Avalonia / WPF + WPF-UI | ✅ **Avalonia 12** — lezárva 2026-10-25 |
-| D2 | Flow-adat forrása | ETW / periodikus socket-poll / WinDivert | ETW + poll kiegészítésként; WinDivert csak ha kell |
-| D3 | Blokkolás módja | `INetFwPolicy2` (Windows Firewall) / saját WFP filterek | Firewall API-val indulni (egyszerű, perzisztens), WFP-re váltani ha nem elég granuláris |
-| D4 | Packet capture | Npcap+SharpPcap / WinDivert / ETW pktmon | Npcap, de a külső dependency kezelését meg kell oldani |
-| D5 | **TLS-stratégia** | per-process keylog / MITM proxy / mindkettő | **Mindkettő**, keylog az elsődleges — ez szünteti meg a `plan.txt`-ben leírt kényelmetlenséget |
-| D6 | MITM implementáció | saját (Kestrel-alapú) / mitmproxy wrap / Fiddler Core | M0 spike döntse el; Titanium Web Proxy már nem maintained |
+- [x] `scriptsuild-release.ps1` — önálló (self-contained) build, zip csomag
+- [x] `RELEASE.md`: telepítés, eltávolítás, mihez kell admin, hol tárol adatot, korlátok
+- [x] Aláírás **kihagyva** (a te döntésed) — a SmartScreen-figyelmeztetés dokumentálva;
+      a szkript `-CertificatePath`-szal később bekapcsolható, a jelszó környezeti változóból
+- [ ] MSI/MSIX installer — a zip + `Install Keyhole.cmd` egyelőre elég
+- [ ] Automatikus frissítés — kihagyva
 
----
-
-## Kockázatok
-
-- **Antivírus/EDR false positive** — a forgalom-elfogás és env-var injektálás gyanús minta. Mitigáció: kódaláírás, dokumentált viselkedés.
-- **Avalonia natív integráció** — a tray-ikon, az `.exe`-ikon kinyerése és a fájl-picker Windows-specifikus; Avalonián ezekhez saját P/Invoke kell (`Keyhole.Native`), nem kapjuk ingyen mint WinUI-on.
-- **Cert pinning** — a MITM út eleve nem fog működni appok egy részénél; ezt nem bugként, hanem korlátként kell kommunikálni az UI-ban.
-- **Npcap licenc** — kereskedelmi terjesztésnél licencdíjas; ha ez cél, M0-ban tisztázni.
-- **Admin-jogosultság** — elkerülhetetlen; a service-modell a kockázat minimalizálása.
-- **ETW event-drop nagy forgalomnál** — pufferméret-tuning és számláló-alapú korrekció kell.
+**Igazolva:** a `dist\Keyhole-0.1.0.zip` (118 MB) elkészült, és a **publikált** binárisok
+futnak: a service felhozza a pipe-ot, a UI csatlakozik és megjeleníti az élő forgalmat —
+nem `dotnet run`-ból, hanem a kiadott exe-kből.
 
 ---
 
-## Nyitott ellenőrzés: ETW emelt jogon
+## Ami ellenőrizetlen maradt
 
-A byte-számlálás valódi működése még nincs igazolva. Emelt jogú PowerShellben:
+Egy helyen kell emelt jogon futtatni, egy paranccsal:
 
 ```powershell
-dotnet run --project src\Keyhole.Service
+.\scriptserify-elevated.ps1     # emelt jogú PowerShellből, futó service mellett
 ```
 
-Amit látni kell: a `Byte counting needs administrator rights` figyelmeztetés **nem** jelenik meg,
-helyette `ETW byte counting started`. A UI-ban a Traffic oszlop `—` helyett valódi értékeket mutat,
-és a sárga figyelmeztető sáv eltűnik.
+Ez lefedi azt a kettőt, amit a fejlesztői környezet (nem emelt jogú) nem engedett igazolni:
 
-Ha hibázik, a `%ProgramData%\Keyhole\logs` naplóban lesz az ok.
+| Mi | Miért nem ellenőriztem | Mit igazoltam helyette |
+|---|---|---|
+| **ETW byte-számlálás** valódi működése | a trace session adminjogot kér | hiánya esetén a monitorozás fut tovább, és a UI megindokolja |
+| **Tűzfalszabály írása** | a szabályírás adminjogot kér | a COM-réteg olvasásra működik; minden írás érthető indokkal utasít el |
+
+Ezen kívül **nem futtattam hosszú terhelési tesztet** (memória-szivárgás, WAL-növekedés
+napokon át). A retention és a prune be van kötve és tesztelt, de valós hosszú futás alatt
+nem mértem.
+
+---
+
+## Mi maradt ki tudatosan
+
+| Terület | Miért |
+|---|---|
+| Npcap csomagrögzítés, beépített TLS-dekódolás | a te döntésed: csak keylog, külső függőség nélkül |
+| MITM proxy a Schannel-appokhoz | ugyanaz; CA-telepítés kellene a trust store-ba |
+| Kódaláírás | nincs tanúsítvány; a build-szkript készen áll rá |
+| MSI/MSIX installer | a zip + `Install Keyhole.cmd` egyelőre elég |
+| GeoIP (ország/ASN) | nem blokkol semmit, bármikor pótolható |
+| UDP távoli végpontok | a socket-tábla nem tartalmazza; ETW-ből kijönne, a felület (`GetUdpPeers`) megvan |
+| Szabályok import/export | nem blokkol semmit |
+
+---
 
 ## Következő lépés
 
-**M3 (UI)** vagy **M4 (blokkolás)** — a sorrend szabadon választható, a kettő független.
-M4 adja a `plan.txt` másik fő kívánságát (gyanús szoftver letiltása), M3 teszi használhatóvá
-a meglévő adatot (grafikonok, keresés, ikonok).
+A tervezett mérföldkövek lezárva. Ha folytatod, a sorrend amit javaslok:
+
+1. **`verify-elevated.ps1` lefuttatása** — ez zárja le a két nyitott ellenőrzést.
+2. **UDP-célpontok ETW-ből** — ez a legnagyobb valódi hiányosság a monitorozásban,
+   mert a QUIC/HTTP3 forgalom emiatt célpont nélkül látszik.
+3. **Per-app grafikon a drill-downban** — az adat és a vezérlő is kész, csak be kell kötni.

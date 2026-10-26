@@ -1,3 +1,4 @@
+using Keyhole.Core;
 using Keyhole.Core.Monitoring;
 using Keyhole.Core.Storage;
 using Keyhole.Native;
@@ -20,9 +21,6 @@ public sealed class MonitorService(
     /// is a couple of milliseconds, so this is well under 1% of a core.
     /// </summary>
     public static TimeSpan SampleInterval => TimeSpan.FromSeconds(2);
-
-    /// <summary>How long flow history is kept before pruning.</summary>
-    private static readonly TimeSpan Retention = TimeSpan.FromDays(30);
 
     private static readonly TimeSpan PruneInterval = TimeSpan.FromHours(6);
 
@@ -109,10 +107,14 @@ public sealed class MonitorService(
 
         _lastPruneUtc = DateTimeOffset.UtcNow;
 
-        var removed = repository.PruneOlderThan(Retention);
+        // Re-read each time: the user can change retention in the UI while the service
+        // runs, and re-reading a small JSON file every six hours costs nothing.
+        var retention = SettingsStore.Load().Retention;
+
+        var removed = repository.PruneOlderThan(retention);
         if (removed > 0)
         {
-            logger.LogInformation("Pruned {Count} flows older than {Retention}.", removed, Retention);
+            logger.LogInformation("Pruned {Count} flows older than {Retention}.", removed, retention);
         }
     }
 }

@@ -278,6 +278,35 @@
             </Grid>
           </TabItem>
 
+          <TabItem Header="Settings">
+            <!-- Scrolls: the tab shares the window with the app list, so the panel is
+                 routinely shorter than its content. -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="14,12" Spacing="14" MaxWidth="620" HorizontalAlignment="Left">
+              <CheckBox Content="Close to the tray instead of exiting"
+                        IsChecked="{Binding MinimiseToTray}" />
+              <CheckBox Content="Start Keyhole when I sign in"
+                        IsChecked="{Binding StartWithWindows}" />
+              <CheckBox Content="Resolve remote addresses to hostnames"
+                        IsChecked="{Binding ResolveHostnames}" />
+
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="Keep flow history for" VerticalAlignment="Center" Classes="label" />
+                <NumericUpDown Value="{Binding RetentionDays}" Minimum="1" Maximum="3650"
+                               Increment="1" Width="110" FormatString="0" />
+                <TextBlock Text="days" VerticalAlignment="Center" Classes="label" />
+              </StackPanel>
+
+              <TextBlock Text="{Binding SettingsMessage}" Classes="label" TextWrapping="Wrap"
+                         Foreground="{DynamicResource WarningText}"
+                         IsVisible="{Binding SettingsMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+              <TextBlock TextWrapping="Wrap" Classes="label"
+                         Text="Flow history, rules and captures live in %ProgramData%\Keyhole. Capture folders contain TLS keys — treat them as sensitive." />
+            </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
         </TabControl>
       </Border>
     </Grid>
