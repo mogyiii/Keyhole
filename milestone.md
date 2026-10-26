@@ -3,8 +3,8 @@
 > Hálózati forgalom-elemző és -szabályozó .NET alkalmazás Windowsra.
 > Cél: a GlassWire átláthatósága + a Wireshark mélysége, kézi env-var kapcsolgatás nélkül.
 
-**Állapot:** M2 kész ✅ — következik M3 (UI) vagy M4 (blokkolás)
-**Utolsó frissítés:** 2026-10-25
+**Állapot:** M4 kész ✅ — következik M3 (UI)
+**Utolsó frissítés:** 2026-10-26
 
 ---
 
@@ -48,8 +48,8 @@
 | Teendő | Kimenet |
 |---|---|
 | ~~UI keretrendszer kiválasztása~~ | ✅ **Avalonia** (D1 lezárva) |
-| ETW `Microsoft-Windows-Kernel-Network` spike | PID→kapcsolat eventek olvashatók-e stabilan, mekkora a drop rate |
-| WFP vs. `INetFwPolicy2` spike blokkoláshoz | melyik tud per-exe denyt, túlélik-e a szabályok az újraindítást |
+| ~~ETW spike~~ | ✅ `EtwByteCounter` megvalósítva (D2) |
+| ~~WFP vs. `INetFwPolicy2`~~ | ✅ **INetFwPolicy2** — a szabályokat az OS birtokolja, túlélik az újraindítást (D3) |
 | Npcap jelenlét/telepítés kezelése | silent install vagy "Npcap szükséges" onboarding flow |
 | TLS-stratégia spike (keylog vs. MITM) | mérés: hány app fedhető le melyik úttal |
 
@@ -64,7 +64,7 @@
 - [x] Named pipe IPC, ACL-lel az interaktív userre; JSON-RPC-szerű kontraktus
 - [x] SQLite séma + migrációk (`flows`, `processes`, `rules`, `sessions`)
 - [x] Strukturált logolás (Serilog) fájlba és konzolra
-- [ ] CI: build + unit tesztek (nincs még repo/remote — az M2 elején)
+- [x] CI: build + unit tesztek GitHub Actionsön (`windows-latest`)
 
 **Done:** az UI elindul, a named pipe-on lekéri a service állapotát, és megjeleníti a verziót, uptime-ot
 és az elevation-állapotot. 18 teszt zöld, a teljes solution 0 warninggal fordul.
@@ -120,18 +120,31 @@ A drill-down kattintásra megadja a kapcsolatokat PID-enként. 86 teszt zöld.
 
 ---
 
-## M4 — Blokkolás és szabályok
+## M4 — Blokkolás és szabályok ✅
 
 > **Hatókör:** csak manuális blokkolás. A tipikus munkamenet: feltűnik egy gyanús szoftver a listában → egy kattintással elveszti a hálózatot. Nincs deny-by-default, nincs engedélykérő prompt.
 
-- [ ] Alkalmazás betallózása (`.exe` picker) + szabály létrehozása
-- [ ] **Blokkolás egy kattintással** közvetlenül az app-listából (a monitorozott appra, külön tallózás nélkül)
-- [ ] **Per-app blokk** kimenő/bejövő irányra külön
-- [ ] Szabály-perzisztencia, és egyezés *útvonalra + hash-re* (ne lehessen átnevezéssel kijátszani)
-- [ ] Szabálylista UI: engedélyezés/tiltás, törlés, importálás/exportálás
-- [ ] Failsafe: ha a service meghal, maradjon konzisztens állapot (ne zárjuk ki a gépet a netről)
+- [x] Alkalmazás betallózása (`.exe` picker) + szabály létrehozása
+- [x] **Blokkolás egy kattintással** közvetlenül az app-listából
+- [x] **Per-app blokk** kimenő/bejövő irányra külön
+- [x] Szabály-perzisztencia, és egyezés *útvonalra + hash-re*
+- [x] Szabálylista UI: feloldás, „executable changed" jelzés
+- [x] Failsafe: a tűzfal írása előzi meg a tárolást, így sosem állítjuk tévesen blokkoltnak
+- [ ] Szabályok importálása/exportálása — elhalasztva, nem blokkol semmit
 
-**Done, ha:** egy betallózott app azonnal elveszti a netet, az újraindítás után is, és a blokk feloldása után újra működik — és ez tesztelve van store-appra is.
+**Kész:** a tűzfal-háttér (`WindowsFirewall`, INetFwPolicy2 COM), a szabálytár SHA-256 rögzítéssel,
+az indulási egyeztetés és a teljes UI (Block gomb + betallózás + „Blocked apps" fül).
+
+> **Nem ellenőrzött:** a tényleges szabályírás. Emelt jogot kér, a fejlesztői környezet nem az.
+> Igazolva: a COM-réteg olvasásra működik, és jogosultság híján minden írás érthető indokkal
+> utasít el. A teljes kör ellenőrzése egy paranccsal: `scripts\verify-elevated.ps1` (emelt jogon).
+
+### Megtalált és javított hibák
+
+| Hiba | Hatás | Javítás |
+|---|---|---|
+| `string.GetHashCode` a szabálynévben | A .NET futásonként randomizálja — a név minden service-indításnál más lett volna, az egyeztetés minden szabályt elárvított volna | Determinisztikus SHA-256 alapú név |
+| Fájlnév megtartotta az írásmódot | `app.exe` és `App.exe` két külön szabálynevet adott ugyanarra a programra | A teljes név kisbetűsítve, nem csak a hash |
 
 ---
 

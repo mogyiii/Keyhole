@@ -52,28 +52,49 @@
                    Fill="{Binding State, Converter={StaticResource StateToBrush}}" />
           <TextBlock Text="{Binding State}" Classes="heading" VerticalAlignment="Center" />
         </StackPanel>
+        <Button Content="Block an app…" Command="{Binding BrowseAndBlockCommand}"
+                IsEnabled="{Binding CanBlock}" Padding="14,6" />
         <Button Content="Refresh" Command="{Binding RefreshCommand}"
                 IsEnabled="{Binding !IsBusy}" Padding="14,6" />
       </StackPanel>
     </Grid>
 
-    <!-- Warning strip: explains zero byte totals instead of leaving them unexplained -->
-    <Border Grid.Row="1" Classes="card" Margin="0,14,0,0" Padding="14,10"
-            Background="#2A2113" BorderBrush="#4A3A1B"
-            IsVisible="{Binding ByteCountingWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
-      <StackPanel Orientation="Horizontal" Spacing="10">
-        <TextBlock Text="⚠" FontSize="14" Foreground="#D29922" VerticalAlignment="Center" />
-        <TextBlock Text="{Binding ByteCountingWarning}" TextWrapping="Wrap"
-                   Foreground="#E3B341" FontSize="12" VerticalAlignment="Center" />
-      </StackPanel>
-    </Border>
+    <!-- Warning strips: explain missing capability instead of leaving it unexplained -->
+    <StackPanel Grid.Row="1" Spacing="8" Margin="0,14,0,0">
+      <Border Classes="card" Padding="14,10"
+              Background="#2A2113" BorderBrush="#4A3A1B"
+              IsVisible="{Binding ByteCountingWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <TextBlock Text="⚠" FontSize="14" Foreground="#D29922" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding ByteCountingWarning}" TextWrapping="Wrap"
+                     Foreground="#E3B341" FontSize="12" VerticalAlignment="Center" />
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card" Padding="14,10"
+              Background="#2A2113" BorderBrush="#4A3A1B"
+              IsVisible="{Binding BlockingWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <TextBlock Text="⚠" FontSize="14" Foreground="#D29922" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding BlockingWarning}" TextWrapping="Wrap"
+                     Foreground="#E3B341" FontSize="12" VerticalAlignment="Center" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
 
     <!-- App list over connection drill-down -->
     <Grid Grid.Row="2" RowDefinitions="2*,Auto,3*" Margin="0,14,0,0">
 
       <Border Grid.Row="0" Classes="card">
         <Grid RowDefinitions="Auto,*">
-          <TextBlock Grid.Row="0" Text="Applications" Classes="heading" Margin="16,12,16,8" />
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="16,12,16,8">
+            <TextBlock Grid.Column="0" Text="Applications" Classes="heading" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Content="Block selected"
+                    Command="{Binding BlockSelectedCommand}"
+                    IsEnabled="{Binding CanBlock}"
+                    Padding="12,4" FontSize="12" />
+          </Grid>
+
 
           <DataGrid Grid.Row="1"
                     ItemsSource="{Binding Apps}"
@@ -100,38 +121,79 @@
                     HorizontalAlignment="Stretch" ResizeDirection="Rows" />
 
       <Border Grid.Row="2" Classes="card">
-        <Grid RowDefinitions="Auto,*">
-          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="16,12,16,8">
-            <TextBlock Text="Connections" Classes="heading" />
-            <TextBlock Text="{Binding SelectedApp.DisplayName, StringFormat='— {0}'}"
-                       Classes="label" VerticalAlignment="Center"
-                       IsVisible="{Binding HasSelection}" />
-          </StackPanel>
+        <TabControl Margin="8,4,8,8">
 
-          <TextBlock Grid.Row="1" Text="Select an application above to see its connections."
-                     Classes="label" Margin="16,0" VerticalAlignment="Center"
-                     HorizontalAlignment="Center"
-                     IsVisible="{Binding !HasSelection}" />
+          <TabItem>
+            <TabItem.Header>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Connections" />
+                <TextBlock Text="{Binding SelectedApp.DisplayName}" Classes="label"
+                           VerticalAlignment="Center" IsVisible="{Binding HasSelection}" />
+              </StackPanel>
+            </TabItem.Header>
 
-          <DataGrid Grid.Row="1"
-                    ItemsSource="{Binding Flows}"
-                    AutoGenerateColumns="False"
-                    IsReadOnly="True"
-                    CanUserResizeColumns="True"
-                    HeadersVisibility="Column"
-                    Margin="6,0,6,6"
-                    IsVisible="{Binding HasSelection}">
-            <DataGrid.Columns>
-              <DataGridTextColumn Header="Proto" Binding="{Binding Protocol}" Width="70" />
-              <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="70" />
-              <DataGridTextColumn Header="Local" Binding="{Binding Local}" Width="1.4*" />
-              <DataGridTextColumn Header="Remote" Binding="{Binding Remote}" Width="2.4*" />
-              <DataGridTextColumn Header="Port" Binding="{Binding RemotePort}" Width="70" />
-              <DataGridTextColumn Header="State" Binding="{Binding State}" Width="1.2*" />
-              <DataGridTextColumn Header="Traffic" Binding="{Binding Traffic}" Width="150" />
-            </DataGrid.Columns>
-          </DataGrid>
-        </Grid>
+            <Grid>
+              <TextBlock Text="Select an application above to see its connections."
+                         Classes="label" VerticalAlignment="Center" HorizontalAlignment="Center"
+                         IsVisible="{Binding !HasSelection}" />
+
+              <DataGrid ItemsSource="{Binding Flows}"
+                        AutoGenerateColumns="False"
+                        IsReadOnly="True"
+                        CanUserResizeColumns="True"
+                        HeadersVisibility="Column"
+                        IsVisible="{Binding HasSelection}">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Proto" Binding="{Binding Protocol}" Width="70" />
+                  <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="70" />
+                  <DataGridTextColumn Header="Local" Binding="{Binding Local}" Width="1.4*" />
+                  <DataGridTextColumn Header="Remote" Binding="{Binding Remote}" Width="2.4*" />
+                  <DataGridTextColumn Header="Port" Binding="{Binding RemotePort}" Width="70" />
+                  <DataGridTextColumn Header="State" Binding="{Binding State}" Width="1.2*" />
+                  <DataGridTextColumn Header="Traffic" Binding="{Binding Traffic}" Width="150" />
+                </DataGrid.Columns>
+              </DataGrid>
+            </Grid>
+          </TabItem>
+
+          <TabItem Header="Blocked apps">
+            <Grid RowDefinitions="Auto,*">
+              <TextBlock Grid.Row="0" Text="{Binding LastActionMessage}" Classes="label"
+                         Margin="8,4,8,8" TextWrapping="Wrap"
+                         IsVisible="{Binding LastActionMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+              <TextBlock Grid.Row="1"
+                         Text="Nothing is blocked. Use &quot;Block an app…&quot; or select an application above."
+                         Classes="label" VerticalAlignment="Center" HorizontalAlignment="Center"
+                         IsVisible="{Binding !Rules.Count}" />
+
+              <DataGrid Grid.Row="1"
+                        ItemsSource="{Binding Rules}"
+                        AutoGenerateColumns="False"
+                        IsReadOnly="True"
+                        CanUserResizeColumns="True"
+                        HeadersVisibility="Column">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Application" Binding="{Binding DisplayName}" Width="1.4*" />
+                  <DataGridTextColumn Header="Path" Binding="{Binding ExecutablePath}" Width="3*" />
+                  <DataGridTextColumn Header="Direction" Binding="{Binding Direction}" Width="100" />
+                  <DataGridTextColumn Header="Created" Binding="{Binding Created}" Width="140" />
+                  <DataGridTextColumn Header="" Binding="{Binding ExecutableWarning}" Width="2*" />
+                  <DataGridTemplateColumn Header="" Width="110">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate>
+                        <Button Content="Unblock" Padding="10,2" FontSize="11" Margin="4,2"
+                                Command="{Binding $parent[DataGrid].((vm:MainWindowViewModel)DataContext).UnblockCommand}"
+                                CommandParameter="{Binding}" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+                </DataGrid.Columns>
+              </DataGrid>
+            </Grid>
+          </TabItem>
+
+        </TabControl>
       </Border>
     </Grid>
   </Grid>

@@ -49,6 +49,29 @@ public sealed class KeyholeServiceClient(ILogger<KeyholeServiceClient>? logger =
             new ListFlowsRequest { Application = application, IncludeClosed = includeClosed },
             ct);
 
+    public Task<IReadOnlyList<RuleSummary>> ListRulesAsync(CancellationToken ct = default) =>
+        InvokeAsync<IReadOnlyList<RuleSummary>>(IpcMethods.ListRules, null, ct);
+
+    /// <summary>Blocks an executable. Always the result of an explicit user action.</summary>
+    public Task<RuleSummary> BlockAppAsync(
+        string executablePath,
+        string direction = "outbound",
+        string? note = null,
+        CancellationToken ct = default) =>
+        InvokeAsync<RuleSummary>(
+            IpcMethods.BlockApp,
+            new BlockAppRequest { ExecutablePath = executablePath, Direction = direction, Note = note },
+            ct);
+
+    public Task UnblockAppAsync(long ruleId, CancellationToken ct = default) =>
+        InvokeAsync<object>(IpcMethods.UnblockApp, new UnblockAppRequest { RuleId = ruleId }, ct);
+
+    public Task<RuleSummary> SetRuleEnabledAsync(long ruleId, bool enabled, CancellationToken ct = default) =>
+        InvokeAsync<RuleSummary>(
+            IpcMethods.SetRuleEnabled,
+            new SetRuleEnabledRequest { RuleId = ruleId, Enabled = enabled },
+            ct);
+
     /// <summary>
     /// Sends one request and returns its deserialised result.
     /// </summary>

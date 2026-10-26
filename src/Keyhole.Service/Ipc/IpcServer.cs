@@ -2,6 +2,7 @@ using System.IO.Pipes;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text.Json;
+using Keyhole.Core.Blocking;
 using Keyhole.Core.Ipc;
 using Keyhole.Service.Monitoring;
 using Microsoft.Extensions.Hosting;
@@ -178,7 +179,8 @@ public sealed class PingHandler : IIpcMethodHandler
 /// <summary>Answers <see cref="IpcMethods.GetStatus"/> with enough for the UI to show a live badge.</summary>
 public sealed class GetStatusHandler(
     ServiceRuntimeInfo runtime,
-    MonitorService? monitor = null) : IIpcMethodHandler
+    MonitorService? monitor = null,
+    BlockingService? blocking = null) : IIpcMethodHandler
 {
     public string Method => IpcMethods.GetStatus;
 
@@ -195,6 +197,9 @@ public sealed class GetStatusHandler(
             MonitorState = monitor is null ? null : monitor.HasSampled ? "running" : "idle",
             ActiveConnections = monitor?.ActiveConnections,
             ByteCountingUnavailableReason = monitor?.ByteCountingUnavailableReason,
+            BlockingUnavailableReason = blocking is { CanModifyRules: false }
+                ? blocking.UnavailableReason
+                : null,
         };
 
         return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(status, IpcChannel.Json));

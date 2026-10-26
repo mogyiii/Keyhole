@@ -37,6 +37,18 @@ public static class IpcMethods
 
     /// <summary>Connections for one application, for the drill-down view.</summary>
     public const string ListFlows = "list-flows";
+
+    /// <summary>Every block rule the user has created.</summary>
+    public const string ListRules = "list-rules";
+
+    /// <summary>Blocks an executable. Always an explicit user action.</summary>
+    public const string BlockApp = "block-app";
+
+    /// <summary>Removes a block rule by id.</summary>
+    public const string UnblockApp = "unblock-app";
+
+    /// <summary>Enables or disables a rule without deleting it.</summary>
+    public const string SetRuleEnabled = "set-rule-enabled";
 }
 
 public sealed record IpcRequest
@@ -99,6 +111,12 @@ public sealed record ServiceStatus
     /// figures are missing instead of showing zeros that look like real measurements.
     /// </summary>
     public string? ByteCountingUnavailableReason { get; init; }
+
+    /// <summary>
+    /// Why blocking is unavailable, or null when rules can be created. Lets the UI
+    /// disable the block button with an explanation instead of failing on click.
+    /// </summary>
+    public string? BlockingUnavailableReason { get; init; }
 }
 
 /// <summary>Parameters for <see cref="IpcMethods.ListFlows"/>.</summary>
@@ -128,6 +146,48 @@ public sealed record AppSummary
     public required DateTimeOffset LastActiveUtc { get; init; }
     public IReadOnlyList<string> RecentRemoteHosts { get; init; } = [];
     public IReadOnlyList<int> ProcessIds { get; init; } = [];
+}
+
+/// <summary>Parameters for <see cref="IpcMethods.BlockApp"/>.</summary>
+public sealed record BlockAppRequest
+{
+    public required string ExecutablePath { get; init; }
+
+    /// <summary>"outbound", "inbound" or "both". Outbound is what blocking usually means.</summary>
+    public string Direction { get; init; } = "outbound";
+
+    public string? Note { get; init; }
+}
+
+/// <summary>Parameters for <see cref="IpcMethods.UnblockApp"/>.</summary>
+public sealed record UnblockAppRequest
+{
+    public required long RuleId { get; init; }
+}
+
+/// <summary>Parameters for <see cref="IpcMethods.SetRuleEnabled"/>.</summary>
+public sealed record SetRuleEnabledRequest
+{
+    public required long RuleId { get; init; }
+    public required bool Enabled { get; init; }
+}
+
+/// <summary>One block rule as the UI sees it.</summary>
+public sealed record RuleSummary
+{
+    public required long Id { get; init; }
+    public required string DisplayName { get; init; }
+    public required string ExecutablePath { get; init; }
+    public required string Direction { get; init; }
+    public required bool IsEnabled { get; init; }
+    public string? Note { get; init; }
+    public required DateTimeOffset CreatedUtc { get; init; }
+
+    /// <summary>
+    /// "match", "changed" or "unknown". "changed" means a different binary now sits at
+    /// the blocked path than the one the rule was created for.
+    /// </summary>
+    public required string ExecutableState { get; init; }
 }
 
 /// <summary>One connection in the drill-down view.</summary>

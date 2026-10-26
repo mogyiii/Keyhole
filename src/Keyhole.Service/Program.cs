@@ -1,4 +1,5 @@
 using Keyhole.Core;
+using Keyhole.Core.Blocking;
 using Keyhole.Core.Ipc;
 using Keyhole.Core.Monitoring;
 using Keyhole.Core.Storage;
@@ -60,10 +61,20 @@ try
     builder.Services.AddSingleton<MonitorService>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<MonitorService>());
 
+    // Blocking needs elevation too. Like byte counting, an unavailable firewall is
+    // reported rather than fatal: monitoring is useful on its own.
+    builder.Services.AddSingleton<IFirewall, WindowsFirewall>();
+    builder.Services.AddSingleton<RuleRepository>();
+    builder.Services.AddSingleton<BlockingService>();
+
     builder.Services.AddSingleton<IIpcMethodHandler, PingHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, GetStatusHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, ListAppsHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, ListFlowsHandler>();
+    builder.Services.AddSingleton<IIpcMethodHandler, ListRulesHandler>();
+    builder.Services.AddSingleton<IIpcMethodHandler, BlockAppHandler>();
+    builder.Services.AddSingleton<IIpcMethodHandler, UnblockAppHandler>();
+    builder.Services.AddSingleton<IIpcMethodHandler, SetRuleEnabledHandler>();
     builder.Services.AddHostedService<IpcServer>();
 
     var host = builder.Build();
@@ -82,9 +93,26 @@ try
 
     if (!runtime.IsElevated)
     {
-        // Not fatal yet — M1 has nothing privileged — but every later milestone needs it.
         Log.Warning(
-            "Service is not elevated. Flow monitoring, firewall rules and packet capture will fail.");
+            "Service is not elevated. Byte counting and blocking are unavailable; " +
+            "connection monitoring still works.");
+    }
+
+    // Keyhole and the firewall can drift apart while the service is not running: a rule
+    // can be deleted by hand or wiped by a firewall reset. Re-apply the stored intent
+    // before accepting requests, so a block the user asked for is actually in force.
+    var reconciliation = host.Services.GetRequiredService<BlockingService>().Reconcile();
+    if (reconciliation.SkippedReason is { } skipped)
+    {
+        Log.Information("Rule reconciliation skipped: {Reason}", skipped);
+    }
+    else if (reconciliation.DidAnything)
+    {
+        Log.Information(
+            "Rule reconciliation: {Restored} re-applied, {Orphans} orphans removed, {Changed} executables changed.",
+            reconciliation.Restored.Count,
+            reconciliation.RemovedOrphans.Count,
+            reconciliation.ChangedExecutables.Count);
     }
 
     await host.RunAsync();

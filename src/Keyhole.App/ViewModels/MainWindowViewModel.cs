@@ -58,6 +58,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string? _byteCountingWarning;
 
+    /// <summary>Set when rules cannot be written, so Block is disabled with an explanation.</summary>
+    [ObservableProperty]
+    private string? _blockingWarning;
+
+    /// <summary>Result of the last block or unblock, shown next to the rules list.</summary>
+    [ObservableProperty]
+    private string? _lastActionMessage;
+
+    public bool CanBlock => BlockingWarning is null;
+
+    partial void OnBlockingWarningChanged(string? value) => OnPropertyChanged(nameof(CanBlock));
+
+    public ObservableCollection<RuleRow> Rules { get; } = [];
+
     [ObservableProperty]
     private bool _isBusy;
 
@@ -91,9 +105,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             ServiceIsElevated = status.IsElevated;
             ActiveConnections = status.ActiveConnections ?? 0;
             ByteCountingWarning = status.ByteCountingUnavailableReason;
+            BlockingWarning = status.BlockingUnavailableReason;
 
             var apps = await _client.ListAppsAsync(cts.Token);
             MergeApps(apps);
+            await LoadRulesAsync(cts.Token);
 
             State = ConnectionState.Connected;
             StatusMessage = $"{Apps.Count} apps, {ActiveConnections} active connections.";
@@ -181,6 +197,110 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// Blocks the selected application. Only reachable from a deliberate click; Keyhole
+    /// never creates a rule on its own.
+    /// </summary>
+    [RelayCommand]
+    private async Task BlockSelectedAsync()
+    {
+        if (SelectedApp?.ExecutablePath is not { } path)
+        {
+            LastActionMessage = "This entry has no readable executable path, so it cannot be blocked.";
+            return;
+        }
+
+        await BlockPathAsync(path);
+    }
+
+    /// <summary>Blocks an executable chosen through the file picker.</summary>
+    [RelayCommand]
+    private async Task BrowseAndBlockAsync()
+    {
+        if (PickExecutableAsync is null)
+        {
+            return;
+        }
+
+        var path = await PickExecutableAsync();
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            await BlockPathAsync(path);
+        }
+    }
+
+    /// <summary>
+    /// Supplied by the view: Avalonia's file picker needs a window handle, which a view
+    /// model has no business holding.
+    /// </summary>
+    public Func<Task<string?>>? PickExecutableAsync { get; set; }
+
+    private async Task BlockPathAsync(string path)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var rule = await _client.BlockAppAsync(path, "outbound", null, cts.Token);
+
+            LastActionMessage = $"Blocked {rule.DisplayName}.";
+            await LoadRulesAsync(cts.Token);
+        }
+        catch (ServiceCallException ex)
+        {
+            // Carries the real reason — not elevated, file missing — so show it verbatim.
+            LastActionMessage = ex.Message;
+        }
+        catch (Exception ex) when (ex is ServiceUnavailableException or OperationCanceledException)
+        {
+            LastActionMessage = "The service did not respond; the block was not applied.";
+        }
+    }
+
+    [RelayCommand]
+    private async Task UnblockAsync(RuleRow? rule)
+    {
+        if (rule is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await _client.UnblockAppAsync(rule.Id, cts.Token);
+
+            LastActionMessage = $"Unblocked {rule.DisplayName}.";
+            await LoadRulesAsync(cts.Token);
+        }
+        catch (ServiceCallException ex)
+        {
+            LastActionMessage = ex.Message;
+        }
+        catch (Exception ex) when (ex is ServiceUnavailableException or OperationCanceledException)
+        {
+            LastActionMessage = "The service did not respond; the rule was not removed.";
+        }
+    }
+
+    private async Task LoadRulesAsync(CancellationToken ct)
+    {
+        try
+        {
+            var rules = await _client.ListRulesAsync(ct);
+
+            Rules.Clear();
+            foreach (var rule in rules)
+            {
+                Rules.Add(new RuleRow(rule));
+            }
+        }
+        catch (Exception ex) when (ex is ServiceUnavailableException or ServiceCallException
+                                      or OperationCanceledException)
+        {
+            Rules.Clear();
+        }
+    }
+
     private async Task LoadFlowsAsync(AppRow? app, CancellationToken ct = default)
     {
         if (app is null)
@@ -228,6 +348,12 @@ public sealed partial class AppRow : ObservableObject
 
     public string Key { get; }
 
+    /// <summary>
+    /// Null when the path could not be read, which is why Block has to check: the
+    /// firewall matches on path, so there is nothing to write a rule against.
+    /// </summary>
+    public string? ExecutablePath { get; private set; }
+
     [ObservableProperty] private string _displayName = "";
     [ObservableProperty] private string? _publisher;
     [ObservableProperty] private string _signature = "";
@@ -238,6 +364,7 @@ public sealed partial class AppRow : ObservableObject
 
     public void Update(AppSummary summary)
     {
+        ExecutablePath = summary.ExecutablePath;
         DisplayName = summary.DisplayName;
         Publisher = summary.Publisher;
         Signature = summary.Signature;
@@ -246,6 +373,30 @@ public sealed partial class AppRow : ObservableObject
         Traffic = Format.Traffic(summary.BytesSent, summary.BytesReceived);
         RemoteHosts = string.Join(", ", summary.RecentRemoteHosts);
     }
+}
+
+/// <summary>One block rule in the rules list.</summary>
+public sealed class RuleRow(RuleSummary rule)
+{
+    public long Id { get; } = rule.Id;
+    public string DisplayName { get; } = rule.DisplayName;
+    public string ExecutablePath { get; } = rule.ExecutablePath;
+    public string Direction { get; } = rule.Direction;
+    public bool IsEnabled { get; } = rule.IsEnabled;
+    public string Created { get; } = rule.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+
+    /// <summary>
+    /// Only surfaced when the binary changed. "match" is the normal case and saying so
+    /// on every row would bury the one line that matters.
+    /// </summary>
+    public string ExecutableWarning { get; } = rule.ExecutableState switch
+    {
+        "changed" => "⚠ executable changed since this rule was created",
+        "unknown" => "",
+        _ => "",
+    };
+
+    public bool HasWarning { get; } = rule.ExecutableState == "changed";
 }
 
 /// <summary>One connection in the drill-down table.</summary>
