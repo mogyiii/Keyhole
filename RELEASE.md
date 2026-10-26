@@ -26,6 +26,7 @@ programnál, ami forgalmat figyel és tűzfalszabályokat ír — ezek önmagukb
 | Kapcsolat-monitorozás | nem kell | működik |
 | Process- és hostnév-feloldás | nem kell | működik (kevesebb elérési út látszik) |
 | **Byte-számlálás (ETW)** | **admin** | a forgalom-oszlop `—` marad, a UI megindokolja |
+| **UDP/QUIC célpontok (ETW)** | **admin** | a UDP-forgalom nem jelenik meg a listában |
 | **Blokkolás (tűzfal)** | **admin** | a Block gombok le vannak tiltva, a UI megindokolja |
 | TLS keylog capture | nem kell | működik |
 
