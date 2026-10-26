@@ -149,6 +149,13 @@ public sealed class MonitorService(
         {
             logger.LogDebug("Flushed byte totals for {Count} open flows.", updated);
         }
+
+        if (byteCounter.IsRunning)
+        {
+            // Which ETW events actually arrive is the first thing worth knowing when
+            // volume figures look wrong in one direction only.
+            logger.LogDebug("ETW events so far: {Counts}", byteCounter.EventCounts);
+        }
     }
 
     private void MaybePrune()

@@ -126,11 +126,44 @@ public sealed class EtwByteCounter : IByteCounterSource, IDisposable
             .OrderByDescending(p => p.Sent + p.Received)
             .ToList();
 
-    private void OnTcpSend(TcpIpSendTraceData data) =>
-        AddTcp(data.saddr, data.sport, data.daddr, data.dport, data.size, sent: true);
+    /// <summary>
+    /// Per-event-type counts. Distinguishes "the provider never sent us this event" from
+    /// "we received it and filed it under a key nobody reads" — two failures that look
+    /// identical from outside and need opposite fixes.
+    /// </summary>
+    private long _tcpSendEvents;
+    private long _tcpRecvEvents;
+    private long _udpSendEvents;
+    private long _udpRecvEvents;
 
-    private void OnTcpReceive(TcpIpTraceData data) =>
+    private int _loggedRecvSample;
+
+    public string EventCounts =>
+        $"tcpSend={Interlocked.Read(ref _tcpSendEvents)} tcpRecv={Interlocked.Read(ref _tcpRecvEvents)} " +
+        $"udpSend={Interlocked.Read(ref _udpSendEvents)} udpRecv={Interlocked.Read(ref _udpRecvEvents)}";
+
+    private void OnTcpSend(TcpIpSendTraceData data)
+    {
+        Interlocked.Increment(ref _tcpSendEvents);
+        AddTcp(data.saddr, data.sport, data.daddr, data.dport, data.size, sent: true);
+    }
+
+    private void OnTcpReceive(TcpIpTraceData data)
+    {
+        Interlocked.Increment(ref _tcpRecvEvents);
+
+        // Log one sample's raw fields. Which endpoint the provider calls source on a
+        // receive decides whether these bytes land on the same key as the matching sends,
+        // and getting it backwards silently records every download as zero.
+        if (Interlocked.Exchange(ref _loggedRecvSample, 1) == 0)
+        {
+            _logger.LogInformation(
+                "First TCP recv event: saddr={Saddr}:{Sport} daddr={Daddr}:{Dport} size={Size} pid={Pid}",
+                data.saddr, data.sport, data.daddr, data.dport, data.size, data.ProcessID);
+        }
+
         AddTcp(data.saddr, data.sport, data.daddr, data.dport, data.size, sent: false);
+    }
 
     private void OnTcpSendV6(TcpIpV6SendTraceData data) =>
         AddTcp(data.saddr, data.sport, data.daddr, data.dport, data.size, sent: true);
@@ -162,11 +195,17 @@ public sealed class EtwByteCounter : IByteCounterSource, IDisposable
 
     // ETW carries the owning process on the event itself, which is the only place a UDP
     // datagram's sender is recorded: the UDP socket table has no peer column at all.
-    private void OnUdpSend(UdpIpTraceData data) =>
+    private void OnUdpSend(UdpIpTraceData data)
+    {
+        Interlocked.Increment(ref _udpSendEvents);
         AddUdp(data.ProcessID, data.sport, data.daddr, data.dport, data.size, sent: true);
+    }
 
-    private void OnUdpReceive(UdpIpTraceData data) =>
+    private void OnUdpReceive(UdpIpTraceData data)
+    {
+        Interlocked.Increment(ref _udpRecvEvents);
         AddUdp(data.ProcessID, data.dport, data.saddr, data.sport, data.size, sent: false);
+    }
 
     private void AddUdp(int processId, int localPort, IPAddress remote, int remotePort, int size, bool sent)
     {

@@ -9,9 +9,18 @@ namespace Keyhole.Core.Ipc;
 /// Client half of the service pipe. Opens a fresh connection per call: calls are rare and
 /// small during M1, and a short-lived connection removes any reconnect state machine.
 /// </summary>
-public sealed class KeyholeServiceClient(ILogger<KeyholeServiceClient>? logger = null)
+public sealed class KeyholeServiceClient(
+    ILogger<KeyholeServiceClient>? logger = null,
+    string? pipeName = null)
 {
     private readonly ILogger _logger = logger ?? NullLogger<KeyholeServiceClient>.Instance;
+
+    /// <summary>
+    /// Overridable so tests can point at a name nothing is listening on. Without this,
+    /// asserting "no service" would depend on the machine not having Keyhole installed,
+    /// which is exactly the state a developer running the product is in.
+    /// </summary>
+    private readonly string _pipeName = pipeName ?? IpcChannel.PipeName;
 
     public static TimeSpan DefaultConnectTimeout => TimeSpan.FromSeconds(3);
 
@@ -107,7 +116,7 @@ public sealed class KeyholeServiceClient(ILogger<KeyholeServiceClient>? logger =
     {
         await using var pipe = new NamedPipeClientStream(
             serverName: ".",
-            pipeName: IpcChannel.PipeName,
+            pipeName: _pipeName,
             direction: PipeDirection.InOut,
             options: PipeOptions.Asynchronous);
 

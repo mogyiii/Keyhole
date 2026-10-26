@@ -17,16 +17,24 @@ namespace Keyhole.Service.Ipc;
 /// </summary>
 public sealed class IpcServer(
     IEnumerable<IIpcMethodHandler> handlers,
-    ILogger<IpcServer> logger) : BackgroundService
+    ILogger<IpcServer> logger,
+    string? pipeName = null) : BackgroundService
 {
     private readonly Dictionary<string, IIpcMethodHandler> _handlers =
         handlers.ToDictionary(h => h.Method, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Overridable so tests get a pipe of their own. Sharing the well-known name with an
+    /// installed service means the client silently reaches that service instead, and the
+    /// tests pass while exercising none of the code they were written for.
+    /// </summary>
+    private readonly string _pipeName = pipeName ?? IpcChannel.PipeName;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation(
             "IPC server listening on \\\\.\\pipe\\{PipeName} with {HandlerCount} methods: {Methods}",
-            IpcChannel.PipeName,
+            _pipeName,
             _handlers.Count,
             string.Join(", ", _handlers.Keys.Order()));
 
@@ -134,7 +142,7 @@ public sealed class IpcServer(
     /// pipe would let any local account issue privileged calls. Only interactive users and
     /// administrators may connect; everything else, including NETWORK, is denied by omission.
     /// </summary>
-    private static NamedPipeServerStream CreateServerStream()
+    private NamedPipeServerStream CreateServerStream()
     {
         var security = new PipeSecurity();
 
@@ -154,7 +162,7 @@ public sealed class IpcServer(
             AccessControlType.Allow));
 
         return NamedPipeServerStreamAcl.Create(
-            pipeName: IpcChannel.PipeName,
+            pipeName: _pipeName,
             direction: PipeDirection.InOut,
             maxNumberOfServerInstances: 1,
             transmissionMode: PipeTransmissionMode.Byte,
