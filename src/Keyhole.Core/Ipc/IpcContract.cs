@@ -160,6 +160,15 @@ public sealed record ServiceStatus
 
     /// <summary>Installed Npcap version, when it reports one.</summary>
     public string? NpcapVersion { get; init; }
+
+    /// <summary>
+    /// Why country and operator lookups are unavailable, or null when they work.
+    ///
+    /// Names the folder and the files it wants, because "GeoIP unavailable" leaves the
+    /// user with nothing to do about it. Keyhole does not download them: the databases are
+    /// MaxMind's and need a free account.
+    /// </summary>
+    public string? GeoIpUnavailableReason { get; init; }
 }
 
 /// <summary>Parameters for <see cref="IpcMethods.ListFlows"/>.</summary>
@@ -238,6 +247,13 @@ public sealed record HostSummary
     public required long BytesSent { get; init; }
     public required long BytesReceived { get; init; }
     public required DateTimeOffset LastActiveUtc { get; init; }
+
+    /// <summary>
+    /// Where this destination is, from the first of its addresses that resolves. One host
+    /// can span countries behind a CDN, but the column answers "roughly where is this",
+    /// and picking one is more useful than listing several.
+    /// </summary>
+    public EndpointLocation? Location { get; init; }
 }
 
 /// <summary>Parameters for <see cref="IpcMethods.BlockApp"/>.</summary>
@@ -410,6 +426,29 @@ public sealed record RuleSummary
     public required string ExecutableState { get; init; }
 }
 
+/// <summary>
+/// Where a remote endpoint is and who operates its network, from the offline GeoIP
+/// databases.
+///
+/// Every field is optional and the whole record is null when nothing is known: the country
+/// and ASN databases are separate files, a user may have one and not the other, and a
+/// private address has neither. A blank column is the honest rendering of "no data"; an
+/// "unknown" placeholder on every row is not.
+/// </summary>
+public sealed record EndpointLocation
+{
+    /// <summary>Two-letter ISO code, for a compact column.</summary>
+    public string? CountryCode { get; init; }
+
+    /// <summary>The readable name, for a tooltip.</summary>
+    public string? CountryName { get; init; }
+
+    public long? AutonomousSystemNumber { get; init; }
+
+    /// <summary>Who operates the network — usually more telling than the country.</summary>
+    public string? Organisation { get; init; }
+}
+
 /// <summary>One connection in the drill-down view.</summary>
 public sealed record FlowSummary
 {
@@ -427,4 +466,10 @@ public sealed record FlowSummary
     public required DateTimeOffset LastSeenUtc { get; init; }
     public DateTimeOffset? EndedUtc { get; init; }
     public bool IsActive => EndedUtc is null;
+
+    /// <summary>
+    /// Where the remote end is, or null when no GeoIP database is installed and for
+    /// addresses that never left the local network.
+    /// </summary>
+    public EndpointLocation? Location { get; init; }
 }

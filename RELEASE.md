@@ -31,6 +31,8 @@ programnál, ami forgalmat figyel és tűzfalszabályokat ír — ezek önmagukb
 | TLS keylog capture | nem kell | működik |
 | **Csomagrögzítés (Npcap)** | **admin + Npcap** | a session csak TLS-kulcsokat gyűjt, a Capture fül megindokolja |
 | **TLS-dekódolás (kérés/válasz nézet)** | ugyanaz | nincs mit dekódolni csomagok nélkül |
+| Top hostok panel | nem kell | működik (forgalom-számok adminhoz kötöttek) |
+| **Ország / üzemeltető (GeoIP)** | nem kell, de **MMDB-fájl** igen | a két oszlop üres marad, a Hosts fül megindokolja |
 
 A **service** fut rendszergazdaként (LocalSystem), a **UI nem**. Ez szándékos: így nincs
 UAC-prompt minden indításnál, és egy UI-hiba sem fut emelt jogosultsággal.
@@ -53,6 +55,26 @@ UAC-prompttal, nem csendben. Ami nem megy át az ellenőrzésen, az törlődik, 
 
 Enélkül a Keyhole minden mása változatlanul működik, a TLS keylog is: pontosan annyit
 tud, amennyit M8 előtt tudott.
+
+### GeoIP: szintén nincs a csomagban
+
+Az **ország** és **üzemeltető** oszlopok MaxMind MMDB-fájlokból olvasnak, amik **nincsenek
+a zipben**: a MaxMind fiókot kér a letöltéshez, és a licence szabályozza a
+továbbterjesztést. A Keyhole nem is töltheti le helyetted.
+
+Ha kérsz egy ingyenes MaxMind-fiókot, töltsd le a **GeoLite2 Country** és a **GeoLite2 ASN**
+adatbázist, és tedd a `.mmdb` fájlokat ide:
+
+```
+%ProgramData%\Keyhole\geoip
+```
+
+A Keyhole a következő indításkor felveszi őket. A `GeoLite2-City.mmdb` is megteszi a
+Country helyett — az is tartalmaz országadatot. Enélkül a két oszlop üresen marad, és a
+Hosts fül kiírja, mit hova kell tenni.
+
+> A lekérdezés **teljesen offline**, és ez szándékos: egy eszköz, ami azt mutatja meg, mit
+> küldenek más programok, nem kezdhet el magától kéréseket küldeni harmadik félnek.
 
 ---
 
@@ -113,6 +135,7 @@ Minden a `%ProgramData%\Keyhole` alatt:
 | `keyhole.sqlite` | forgalomtörténet, folyamatok, szabályok, capture-session-ök |
 | `settings.json` | a Settings fül beállításai |
 | `logs\` | napi rotált naplók, 14 nap |
+| `geoip\` | ide tedd a MaxMind `.mmdb` fájlokat; a Keyhole csak olvassa |
 | `captures\` | **TLS-kulcsok és a rögzített forgalom** session-önként |
 
 > ⚠️ **A `captures\` mappa M8 óta érzékenyebb, mint volt.** Korábban csak TLS-kulcsokat

@@ -45,6 +45,11 @@ futna elevated módban, minden UI-bug admin-jogosultságú lenne, és minden ind
 - **Kérés/válasz nézet a UI-ban** — a Keyhole a saját kulcsaival visszafejti a saját
   felvételét: metódus, URL, státusz, fejlécek, méret, idő. HTTP/1.1 és HTTP/2 (HPACK);
   a QUIC/HTTP3 rögzítve van, de nem dekódolható, és ezt a UI kiírja
+- **Top hostok** — melyik *célpont* kapja a legtöbb forgalmat, appoktól függetlenül; itt
+  bukkan elő, ha három egymással össze nem függő program ugyanazzal a hosttal beszél
+- **Ország és hálózat-üzemeltető** offline MaxMind MMDB-ből — nincs hálózati hívás, mert
+  egy forgalom-figyelő nem kezdhet el magától lekérdezéseket küldeni (az adatbázis a
+  felhasználóé, nincs a csomagban)
 
 ## Fejlesztés
 
@@ -80,6 +85,7 @@ felhasználói mappát:
 
 - `keyhole.sqlite` — forgalomtörténet, folyamatok, szabályok, capture-session-ök
 - `logs/` — napi rotált Serilog fájlok, 14 nap
+- `geoip/` — ide kerülnek a MaxMind `.mmdb` fájlok, ha kérsz ország/üzemeltető oszlopot
 - `captures/` — session-önként egy mappa: `capture.pcapng` és `sslkeys.log`
 
 > ⚠️ A `capture.pcapng` **a rögzített forgalmat és a visszafejtéséhez szükséges kulcsokat is

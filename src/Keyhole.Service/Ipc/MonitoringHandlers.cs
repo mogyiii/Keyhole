@@ -53,7 +53,8 @@ public sealed class ListAppsHandler(FlowTracker tracker, BlockingService? blocki
 /// <summary>
 /// Answers <see cref="IpcMethods.ListHosts"/> with the per-destination view.
 /// </summary>
-public sealed class ListHostsHandler(FlowTracker tracker) : IIpcMethodHandler
+public sealed class ListHostsHandler(FlowTracker tracker, IGeoIpLookup? geoIp = null)
+    : IIpcMethodHandler
 {
     public string Method => IpcMethods.ListHosts;
 
@@ -85,10 +86,37 @@ public sealed class ListHostsHandler(FlowTracker tracker) : IIpcMethodHandler
                 BytesSent = h.BytesSent,
                 BytesReceived = h.BytesReceived,
                 LastActiveUtc = h.LastActiveUtc,
+                Location = LocateHost(h),
             })
             .ToList();
 
         return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(hosts, IpcChannel.Json));
+    }
+
+    /// <summary>
+    /// Locates a host from the first of its addresses that resolves.
+    ///
+    /// A host behind a CDN genuinely spans countries, but the column answers "roughly
+    /// where is this" — one answer is more useful than a list, and the addresses are
+    /// listed in their own column for anyone who wants to check.
+    /// </summary>
+    private EndpointLocation? LocateHost(HostActivity host)
+    {
+        if (geoIp is null)
+        {
+            return null;
+        }
+
+        foreach (var address in host.Addresses)
+        {
+            if (System.Net.IPAddress.TryParse(address, out var parsed) &&
+                ListFlowsHandler.Describe(geoIp, parsed) is { } located)
+            {
+                return located;
+            }
+        }
+
+        return null;
     }
 }
 
@@ -113,7 +141,7 @@ public sealed class GetThroughputHandler(FlowTracker tracker) : IIpcMethodHandle
 }
 
 /// <summary>Answers <see cref="IpcMethods.ListFlows"/> with one application's connections.</summary>
-public sealed class ListFlowsHandler(FlowTracker tracker) : IIpcMethodHandler
+public sealed class ListFlowsHandler(FlowTracker tracker, IGeoIpLookup? geoIp = null) : IIpcMethodHandler
 {
     public string Method => IpcMethods.ListFlows;
 
@@ -144,7 +172,10 @@ public sealed class ListFlowsHandler(FlowTracker tracker) : IIpcMethodHandler
             .Where(f => Matches(f, request.Application))
             .Where(f => request.IncludeClosed || f.IsActive)
             .OrderByDescending(f => f.LastSeenUtc)
-            .Select(ToSummary)
+            .Select(f => ToSummary(f) with
+            {
+                Location = Describe(geoIp, f.Connection.RemoteAddress),
+            })
             .ToList();
 
         var response = new FlowsResponse
@@ -173,6 +204,33 @@ public sealed class ListFlowsHandler(FlowTracker tracker) : IIpcMethodHandler
             flow.Process.ExecutablePath ?? flow.Process.DisplayName,
             application,
             StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Where an address is and who runs it, as one line.
+    ///
+    /// Null rather than a placeholder when nothing is known, so the UI can leave the
+    /// column blank instead of filling it with "unknown" for every private address and
+    /// for every user who has not installed a database.
+    /// </summary>
+    internal static EndpointLocation? Describe(IGeoIpLookup? geoIp, System.Net.IPAddress address)
+    {
+        if (geoIp is null)
+        {
+            return null;
+        }
+
+        var info = geoIp.Lookup(address);
+
+        return info.HasAnything
+            ? new EndpointLocation
+            {
+                CountryCode = info.CountryCode,
+                CountryName = info.CountryName,
+                AutonomousSystemNumber = info.AutonomousSystemNumber,
+                Organisation = info.Organisation,
+            }
+            : null;
+    }
 
     internal static FlowSummary ToSummary(TrackedFlow flow) => new()
     {

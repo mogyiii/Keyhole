@@ -11,6 +11,7 @@
          deciding whether a packet belongs to the captured application, and reassembling
          its TCP streams, are both decisions and belong with the testable code. -->
     <PackageReference Include="PacketDotNet" />
+    <PackageReference Include="MaxMind.Db" />
   </ItemGroup>
 
   <ItemGroup>

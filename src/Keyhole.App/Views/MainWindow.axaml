@@ -195,18 +195,42 @@
                   <DataGridTextColumn Header="Proto" Binding="{Binding Protocol}" Width="70" />
                   <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="70" />
                   <DataGridTextColumn Header="Local" Binding="{Binding Local}" Width="1.4*" />
-                  <DataGridTextColumn Header="Remote" Binding="{Binding Remote}" Width="2.4*" />
+                  <DataGridTextColumn Header="Remote" Binding="{Binding Remote}" Width="2.2*" />
                   <DataGridTextColumn Header="Port" Binding="{Binding RemotePort}" Width="70" />
-                  <DataGridTextColumn Header="State" Binding="{Binding State}" Width="1.2*" />
-                  <DataGridTextColumn Header="Traffic" Binding="{Binding Traffic}" Width="150" />
+                  <DataGridTemplateColumn Header="CC" Width="55">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Country}" Margin="6,0" VerticalAlignment="Center"
+                                   ToolTip.Tip="{Binding LocationDetail}" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+                  <DataGridTextColumn Header="Operator" Binding="{Binding Operator}" Width="1.4*" />
+                  <DataGridTextColumn Header="State" Binding="{Binding State}" Width="1.1*" />
+                  <DataGridTextColumn Header="Traffic" Binding="{Binding Traffic}" Width="145" />
                 </DataGrid.Columns>
               </DataGrid>
             </Grid>
           </TabItem>
 
           <TabItem Header="Hosts">
-            <Grid RowDefinitions="Auto,*">
-              <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="8,6,8,8">
+            <Grid RowDefinitions="Auto,Auto,*">
+              <!-- Sits here rather than above the app list: it affects two columns on this
+                   tab and nothing else, so a permanent banner would be noise. -->
+              <Border Grid.Row="0" Classes="card" Padding="12,7" Margin="8,6,8,2"
+                      Background="{DynamicResource WarningBackground}"
+                      BorderBrush="{DynamicResource WarningBorder}"
+                      IsVisible="{Binding HasGeoIpWarning}">
+                <StackPanel Orientation="Horizontal" Spacing="9">
+                  <TextBlock Text="⚠" FontSize="13" Foreground="{DynamicResource WarningIcon}"
+                             VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding GeoIpWarning}" TextWrapping="Wrap"
+                             Foreground="{DynamicResource WarningText}" FontSize="12"
+                             VerticalAlignment="Center" MaxWidth="900" />
+                </StackPanel>
+              </Border>
+
+              <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="8,6,8,8">
                 <TextBlock Grid.Column="0" Classes="label" VerticalAlignment="Center"
                            TextWrapping="Wrap" MaxWidth="430"
                            Text="Destinations ranked by traffic, across every application. The list above answers what one program is doing; this answers it from the other end — a host several unrelated programs all talk to is worth a look. Loopback is excluded." />
@@ -216,11 +240,11 @@
                          VerticalAlignment="Center" FontSize="12" Padding="8,4" />
               </Grid>
 
-              <TextBlock Grid.Row="1" Text="No outbound destinations yet."
+              <TextBlock Grid.Row="2" Text="No outbound destinations yet."
                          Classes="label" VerticalAlignment="Center" HorizontalAlignment="Center"
                          IsVisible="{Binding !VisibleHosts.Count}" />
 
-              <DataGrid Grid.Row="1"
+              <DataGrid Grid.Row="2"
                         ItemsSource="{Binding VisibleHosts}"
                         AutoGenerateColumns="False"
                         IsReadOnly="True"
@@ -228,14 +252,24 @@
                         HeadersVisibility="Column"
                         IsVisible="{Binding VisibleHosts.Count}">
                 <DataGrid.Columns>
-                  <DataGridTextColumn Header="Host" Binding="{Binding Host}" Width="2.4*" />
+                  <DataGridTextColumn Header="Host" Binding="{Binding Host}" Width="2.2*" />
                   <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="100" />
-                  <DataGridTextColumn Header="Traffic" Binding="{Binding Traffic}" Width="170" />
-                  <DataGridTextColumn Header="Conns" Binding="{Binding Connections}" Width="85" />
-                  <DataGridTextColumn Header="Ports" Binding="{Binding Ports}" Width="110" />
-                  <DataGridTextColumn Header="Applications" Binding="{Binding Applications}" Width="2.2*" />
-                  <DataGridTextColumn Header="Addresses" Binding="{Binding Addresses}" Width="1.6*" />
-                  <DataGridTextColumn Header="Last seen" Binding="{Binding LastSeen}" Width="95" />
+                  <DataGridTextColumn Header="Traffic" Binding="{Binding Traffic}" Width="165" />
+                  <DataGridTextColumn Header="Conns" Binding="{Binding Connections}" Width="80" />
+                  <!-- Country and operator hang off the GeoIP databases, so both stay
+                       blank rather than showing a placeholder when none is installed. -->
+                  <DataGridTemplateColumn Header="CC" Width="55">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Country}" Margin="6,0" VerticalAlignment="Center"
+                                   ToolTip.Tip="{Binding LocationDetail}" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+                  <DataGridTextColumn Header="Operator" Binding="{Binding Operator}" Width="1.5*" />
+                  <DataGridTextColumn Header="Ports" Binding="{Binding Ports}" Width="105" />
+                  <DataGridTextColumn Header="Applications" Binding="{Binding Applications}" Width="2*" />
+                  <DataGridTextColumn Header="Last seen" Binding="{Binding LastSeen}" Width="90" />
                 </DataGrid.Columns>
               </DataGrid>
             </Grid>

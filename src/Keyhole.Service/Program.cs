@@ -58,6 +58,12 @@ try
     builder.Services.AddSingleton<EtwByteCounter>();
     builder.Services.AddSingleton<IByteCounterSource>(sp => sp.GetRequiredService<EtwByteCounter>());
 
+    // Country and operator lookups, read from MMDB files the user supplies. Offline by
+    // design: a tool that shows what other programs send must not start sending lookups
+    // of its own. Absent databases degrade to empty columns with a reason attached.
+    builder.Services.AddSingleton<GeoIpLookup>();
+    builder.Services.AddSingleton<IGeoIpLookup>(sp => sp.GetRequiredService<GeoIpLookup>());
+
     builder.Services.AddSingleton<FlowTracker>();
 
     // Registered as a singleton as well as a hosted service so GetStatusHandler can read

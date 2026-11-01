@@ -89,7 +89,7 @@ fejthető).
 - [x] **UDP-célpontok ETW-ből** — a QUIC/HTTP3 forgalom már célponttal látszik
 - [x] **Ikon-kinyerés** az `.exe`-kből (M3-ban)
 - [x] **Élő sebesség** (byte/s) (M3-ban)
-- [ ] **GeoIP** (opcionális, offline MMDB) — elhalasztva, nem blokkol semmit
+- [x] **GeoIP** (offline MMDB) — ország és hálózat-üzemeltető, az utómunkában
 
 **Done:** valódi forgalmon ellenőrizve — Brave, Claude Code, WinDefend, svchost-szolgáltatások és
 `sunshine` is helyes névvel, kiadóval, aláírás-állapottal és feloldott hostnévvel jelenik meg.
@@ -116,7 +116,7 @@ A drill-down kattintásra megadja a kapcsolatokat PID-enként. 86 teszt zöld.
 - [x] **Dashboard:** össz-throughput grafikon fel/le bontásban
 - [x] Sötét/világos/automatikus téma, erőforrás-szótárakkal (nincs beégetett szín)
 - [x] **Per-app grafikon a drill-downban** — a kiválasztott app saját throughputja
-- [ ] Top appok / top hostok panel — a grafikon és a rendezhető lista már lefedi
+- [x] **Top hostok panel** — az utómunkában, ország és üzemeltető oszloppal
 
 **Done:** a fő workflow kattintható. Valódi forgalmon ellenőrizve, mindkét témában.
 
@@ -441,7 +441,7 @@ korlátozza.
 | MITM proxy a Schannel-appokhoz | ugyanaz; CA-telepítés kellene a trust store-ba |
 | Kódaláírás | nincs tanúsítvány; a build-szkript készen áll rá |
 | MSI/MSIX installer | a zip + `Install Keyhole.cmd` egyelőre elég |
-| GeoIP (ország/ASN) | nem blokkol semmit, bármikor pótolható |
+| GeoIP **adatbázisok** szállítása | a MaxMind licence szabályozza; a Keyhole olvassa, amit a felhasználó betesz |
 | Szabályok import/export | nem blokkol semmit |
 
 ---
@@ -523,9 +523,48 @@ ugyanannyira érdekes, mint ahonnan sokat letöltött.
 
 ---
 
+### GeoIP ✅
+
+Ország és hálózat-üzemeltető a távoli végpontokhoz, a kapcsolat-lebontásban és a host
+panelen. **Teljesen offline**, és ez nem kényelmi kérdés: egy eszköz, ami azt mutatja meg,
+mit küldenek más programok, nem kezdhet el magától lekérdezéseket küldeni. Különben minden
+cím, ami a felhasználót érdekli, kérés lenne egy harmadik félhez — pont az a viselkedés,
+aminek az elkapására a Keyhole készült.
+
+**Az adatbázisok nincsenek a csomagban.** A MaxMind fiókot kér a letöltéshez és a licence
+szabályozza a továbbterjesztést, szóval ugyanaz a felállás, mint az Npcapnál: a Keyhole azt
+olvassa, amit a `%ProgramData%\Keyhole\geoip` mappába tesznek, és ha nincs ott semmi, akkor
+**megnevezi a mappát és a fájlokat** — egy „GeoIP unavailable" semmit nem ad a kezébe.
+
+Két részlet, ami nem magától értetődő:
+
+- **A privát címeket nem kérdezi meg.** A loopback, a link-local és a 10/8, 172.16/12,
+  192.168/16 tartományokról egy adatbázisnak sincs mondandója, és egy találat nélküli
+  lekérdezés „ismeretlen országnak" olvasódna, miközben az igazság az, hogy a forgalom
+  **nem hagyta el a hálózatot**.
+- **Üres oszlop, nem „unknown".** Minden privát cím és minden adatbázis nélküli gép
+  egyébként helyőrzőt kapna — ami zaj egy olyan oszlopban, amit végig kell olvasni.
+
+**Hogyan van igazolva.** Az adatbázis a felhasználóé, szóval a tesztek nem támaszkodhatnak
+rá — viszont épp a mezőkinyerés az, ami rossz mezőnévnél **csendben üres oszlopot** ad,
+nem hibát. Ugyanaz a hibaosztály, mint egy elírt Huffman-hossz, és ugyanazt a kezelést
+kapta: a teszt **felépít egy valódi, minimális MMDB fájlt** (egycsomópontú keresőfa, amiben
+minden cím ugyanarra a rekordra fut), és a MaxMind saját olvasóján keresztül olvassa vissza.
+Az első valódi adatbázis mindjárt bele is szaladt a kiterjesztett méret-kódolásba — az
+`autonomous_system_organization` 30 karakter —, ami megerősítette, hogy érdemes volt
+megírni.
+
+---
+
 ## Következő lépés
 
-M1–M8 kész és élesben ellenőrizve, a top hostok panel megvan. A következő:
+M1–M8 kész és élesben ellenőrizve, a top hostok panel és a GeoIP megvan. **298 teszt, mind
+zöld**, hatszor egymás után.
 
-1. **GeoIP** — ország/ASN a távoli végpontokhoz (offline MMDB, nincs hálózati hívás).
-2. **Hosszú terhelési teszt** — az egyetlen méretlen terület.
+A `plan.txt` eredeti céljai teljesültek. Ami nyitva maradt:
+
+1. **Hosszú terhelési teszt** — az egyetlen méretlen terület (memória-szivárgás,
+   WAL-növekedés napokon át). Egyelőre tudatosan kihagyva.
+2. **MITM proxy a Schannel-appokhoz** — saját CA kellene a gépi trust store-ba, kimaradt.
+3. **Kódaláírás**, **MSI/MSIX installer**, **szabály import/export** — lásd *Mi maradt ki
+   tudatosan*.

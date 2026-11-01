@@ -4,6 +4,7 @@ using System.Security.Principal;
 using System.Text.Json;
 using Keyhole.Core.Blocking;
 using Keyhole.Core.Ipc;
+using Keyhole.Core.Monitoring;
 using Keyhole.Native.Npcap;
 using Keyhole.Service.Monitoring;
 using Microsoft.Extensions.Hosting;
@@ -190,7 +191,8 @@ public sealed class GetStatusHandler(
     ServiceRuntimeInfo runtime,
     MonitorService? monitor = null,
     BlockingService? blocking = null,
-    NpcapProbe? npcap = null) : IIpcMethodHandler
+    NpcapProbe? npcap = null,
+    IGeoIpLookup? geoIp = null) : IIpcMethodHandler
 {
     public string Method => IpcMethods.GetStatus;
 
@@ -219,6 +221,8 @@ public sealed class GetStatusHandler(
             PacketCaptureUnavailableReason = packetCapture?.UnavailableReason,
             NpcapState = packetCapture?.State.ToString().ToLowerInvariant(),
             NpcapVersion = packetCapture?.Version,
+
+            GeoIpUnavailableReason = geoIp?.UnavailableReason,
         };
 
         return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(status, IpcChannel.Json));

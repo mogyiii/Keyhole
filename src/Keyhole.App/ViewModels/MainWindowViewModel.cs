@@ -87,6 +87,21 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     private string? _npcapState;
 
     /// <summary>
+    /// Set when country and operator lookups are unavailable.
+    ///
+    /// Shown on the Hosts tab, where the empty columns are, rather than in the strip above
+    /// the app list: it affects two columns and nothing else, and a permanent banner for
+    /// an optional extra would be noise.
+    /// </summary>
+    [ObservableProperty]
+    private string? _geoIpWarning;
+
+    public bool HasGeoIpWarning => GeoIpWarning is not null;
+
+    partial void OnGeoIpWarningChanged(string? value) =>
+        OnPropertyChanged(nameof(HasGeoIpWarning));
+
+    /// <summary>
     /// Whether offering the download would help. Only for a genuinely absent install:
     /// downloading a second copy does not start a stopped driver.
     /// </summary>
@@ -327,6 +342,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             BlockingWarning = status.BlockingUnavailableReason;
             PacketCaptureWarning = status.PacketCaptureUnavailableReason;
             NpcapState = status.NpcapState;
+            GeoIpWarning = status.GeoIpUnavailableReason;
 
             var apps = await _client.ListAppsAsync(cts.Token);
             MergeApps(apps);
@@ -1167,6 +1183,12 @@ public sealed class HostRow(HostSummary host)
 
     public string LastSeen { get; } = host.LastActiveUtc.ToLocalTime().ToString("HH:mm:ss");
 
+    public string Country { get; } = Format.Country(host.Location);
+
+    public string Operator { get; } = Format.Operator(host.Location);
+
+    public string LocationDetail { get; } = Format.LocationDetail(host.Location);
+
     /// <summary>
     /// Matches the search box against everything the row shows. Address and application
     /// are included because "which app talks to this" and "who is at this IP" are both
@@ -1176,7 +1198,11 @@ public sealed class HostRow(HostSummary host)
         Host.Contains(needle, StringComparison.OrdinalIgnoreCase) ||
         Applications.Contains(needle, StringComparison.OrdinalIgnoreCase) ||
         Addresses.Contains(needle, StringComparison.OrdinalIgnoreCase) ||
-        Ports.Contains(needle, StringComparison.OrdinalIgnoreCase);
+        Ports.Contains(needle, StringComparison.OrdinalIgnoreCase) ||
+        // "Which hosts are in CN" and "what else is on Cloudflare" are both reasons to
+        // search here, so the location is searchable as well as visible.
+        Country.Contains(needle, StringComparison.OrdinalIgnoreCase) ||
+        Operator.Contains(needle, StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>One recovered request and response in the Capture tab's request list.</summary>
@@ -1242,10 +1268,62 @@ public sealed class FlowRow(FlowSummary flow)
     public string State { get; } = flow.IsActive ? flow.State : $"{flow.State} (closed)";
     public string Traffic { get; } = Format.Traffic(flow.BytesSent, flow.BytesReceived);
     public bool IsActive { get; } = flow.IsActive;
+
+    public string Country { get; } = Format.Country(flow.Location);
+
+    public string Operator { get; } = Format.Operator(flow.Location);
+
+    /// <summary>The full country name and AS number, for the tooltip.</summary>
+    public string LocationDetail { get; } = Format.LocationDetail(flow.Location);
 }
 
 internal static class Format
 {
+    /// <summary>
+    /// The two-letter country code, or blank.
+    ///
+    /// Blank rather than "unknown": every private address and every machine without a
+    /// GeoIP database would otherwise carry a placeholder, which is noise in a column
+    /// meant to be scanned.
+    /// </summary>
+    public static string Country(EndpointLocation? location) =>
+        location?.CountryCode ?? "";
+
+    /// <summary>
+    /// Who operates the network. Usually more telling than the country — "which company's
+    /// network is this" answers more questions than "which country".
+    /// </summary>
+    public static string Operator(EndpointLocation? location) =>
+        location?.Organisation ?? "";
+
+    /// <summary>The full name and AS number, for a tooltip rather than a column.</summary>
+    public static string LocationDetail(EndpointLocation? location)
+    {
+        if (location is null)
+        {
+            return "";
+        }
+
+        var parts = new List<string>(3);
+
+        if (location.CountryName is { Length: > 0 } name)
+        {
+            parts.Add(name);
+        }
+
+        if (location.Organisation is { Length: > 0 } organisation)
+        {
+            parts.Add(organisation);
+        }
+
+        if (location.AutonomousSystemNumber is { } asn)
+        {
+            parts.Add($"AS{asn}");
+        }
+
+        return string.Join(" — ", parts);
+    }
+
     public static string Traffic(long sent, long received) =>
         sent == 0 && received == 0 ? "—" : $"↑{Bytes(sent)} ↓{Bytes(received)}";
 

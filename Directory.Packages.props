@@ -41,6 +41,13 @@
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.14" />
   </ItemGroup>
 
+  <ItemGroup Label="GeoIP">
+    <!-- The MMDB reader only, Apache-2.0. The database files themselves are not shipped:
+         MaxMind requires an account and its licence governs redistribution. Keyhole reads
+         whatever the user puts in the geoip folder. -->
+    <PackageVersion Include="MaxMind.Db" Version="5.2.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
