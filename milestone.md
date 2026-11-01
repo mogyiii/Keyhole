@@ -314,17 +314,13 @@ a beágyazott keylogot olvassa.
 | **HTTP/2** | a `tshark` ugyanabból a felvételből ugyanazt a metódust, útvonalat és státuszt olvassa — ami a HPACK-ot is független úton ellenőrzi, mert saját dinamikus táblát épít |
 | **Hatókör-szűrés** | szkriptelt csomagokkal: 4 csomagból 2 kerül be, és a kidobott többség a bizonyíték, hogy a szűrés egyáltalán megtörtént |
 
-**268 teszt, 267 zöld** (az egy hiba M8 előtti — lásd *Következő lépés*). Az M8 tesztjei a
-Wireshark-ellenőrzéseket is beleértve mind zöldek; a 86-ról 268-ra nőtt szám nagyrészt a
-HPACK és a TLS teszt-vektorai.
+**270 teszt, mind zöld.** Az M8 tesztjei a Wireshark-ellenőrzéseket is beleértve zöldek;
+a 86-ról 270-re nőtt szám nagyrészt a HPACK és a TLS teszt-vektorai.
 
 ### Élesben ellenőrizve (2026-11-01)
 
-`verify-elevated.ps1` emelt jogon, telepített service-szel, friss Chrome-profillal. Két
-futtatás: az első hozott elő egy hibát, amit egyetlen szintetikus teszt sem fogott volna
-meg, a második a javítást mérte.
-
-Négy futtatás, mindegyik egy hibát hozott elő és a következő mérte a javítást.
+`verify-elevated.ps1` emelt jogon, telepített service-szel, friss Chrome-profillal. Négy
+futtatás, mindegyik egy hibát hozott elő és a következő mérte a javítást.
 
 | Mi | 1. | 2. | 3. | **4.** |
 |---|---|---|---|---|
@@ -458,24 +454,40 @@ korlátozza.
 | **Per-app grafikon** | ✅ a drill-downban, a kapcsolatlista fölött |
 | `verify-elevated.ps1` lefuttatása | ✅ 14/14 PASS (M7 után); M8-cal kiegészítve 22/22 PASS |
 
-### Megtalált és javított hiba
+### Megtalált és javított hibák
 
 | Hiba | Hatás | Javítás |
 |---|---|---|
 | A szűrt lista kétmásodpercenként újraépült | A kijelölés minden frissítéskor elveszett — rákattintottál egy appra, és 2 mp múlva üres lett a drill-down | Helyben szinkronizálás törlés-újratöltés helyett |
+| **A figyelő socketek állapota üresen jelent meg** | A drill-down State oszlopa semmit nem írt egy listenernél. A hiba M1 óta benne volt, és a `SocketTableReaderTests` folyamatosan jelezte, csak nem ott volt a baj, ahol a teszt neve sugallta | Lásd lentebb |
+
+#### A TCP-állapot hibája — és amit nem a gyanú, hanem a mérés mutatott meg
+
+A tünet alapján a `SocketTableReader` struct-layoutja tűnt hibásnak: a `MIB_TCP_STATE` 1-től
+indul, szóval egy nulla rossz eltolásra vall. **Ez tévedés volt**, és három mérés kellett a
+kizárásához:
+
+1. Az `Established` kapcsolatok **helyesen** 5-öt adnak — ha az eltolás csúszna, minden sor
+   romlana, nem csak a listenerek.
+2. A dedikált listener-only táblában, ahol *minden* sor LISTEN, szintén 0-kat olvasunk —
+   tehát nem a sorok válogatása a kérdés.
+3. Végül egy hexdump a saját, frissen `listen()`-elt socketünk soráról, a szomszédaival
+   együtt: a cím, a port és a PID mind helyesen dekódol, a következő sor state-je 5, és a
+   mienk mezője **tényleg nulla**.
+
+Vagyis a kernel ad vissza olyan értéket, amit a `MIB_TCP_STATE` nem tud kifejezni —
+ugyanabban a táblában, ahol más listenerek 2-t adnak. A javítás ezért szűk: egy
+**peer nélküli** sor definíció szerint figyelő socket, szóval ott az értelmezhetetlen
+állapot `Listen` lesz. Peerrel rendelkező sornál `None` marad: ott nincs mit következtetni,
+és egy kitalált állapot rosszabb, mint a bevallott tudatlanság.
+
+Ezzel a `SocketTableReaderTests` terhelés-érzékeny második hibája is elment — ugyanaz volt
+a gyökere. **270 teszt, mind zöld, háromszor egymás után.**
 
 ## Következő lépés
 
 M1–M8 kész és élesben ellenőrizve. A következő:
 
-1. **A TCP-állapot hibája** — egy frissen nyitott listener `None`-t jelent `Listen` helyett.
-   A `MIB_TCP_STATE` 1-től indul, szóval a nulla azt jelenti, hogy az állapot-mező rossz
-   eltolásról jön: valószínűleg az IPv4 és IPv6 TCP-tábla sorai nem ugyanazt a szerkezetet
-   használják, mint amit a `SocketTableReader` feltételez. **M8 előtti hiba** — a `6918fcd`
-   tiszta checkoutján is elhasal, négyből négyszer. A `SocketTableReaderTests` másik tesztje
-   (`Finds_an_established_connection_…`) csak a teljes futás terhelése alatt hasal el, ami
-   ugyanerre a szerkezeti okra plusz időzítésre vall. Felhasználónak látható: a drill-down
-   State oszlopa.
-3. **Top hostok panel** — melyik *célpont* kapja a legtöbb forgalmat, appoktól függetlenül.
-4. **GeoIP** — ország/ASN a távoli végpontokhoz (offline MMDB, nincs hálózati hívás).
-5. **Hosszú terhelési teszt** — a másik méretlen terület.
+1. **Top hostok panel** — melyik *célpont* kapja a legtöbb forgalmat, appoktól függetlenül.
+2. **GeoIP** — ország/ASN a távoli végpontokhoz (offline MMDB, nincs hálózati hívás).
+3. **Hosszú terhelési teszt** — az egyetlen méretlen terület.

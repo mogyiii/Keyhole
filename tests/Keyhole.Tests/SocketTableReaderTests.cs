@@ -26,6 +26,59 @@ public class SocketTableReaderTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void No_tcp_row_reports_a_state_outside_the_enum()
+    {
+        // MIB_TCP_STATE runs from 1 to 12, but GetExtendedTcpTable returns 0 for some
+        // listening sockets — confirmed by hexdumping a socket's row right after calling
+        // listen() on it. Those rows have no peer, so they are reported as Listen.
+        //
+        // Nothing should reach the UI as a raw number the enum cannot name, because the
+        // drill-down shows the state as text.
+        var tcp = _reader.ReadAll()
+            .Where(c => c.Protocol == TransportProtocol.Tcp)
+            .ToList();
+
+        Assert.NotEmpty(tcp);
+
+        var unnamed = tcp
+            .Where(c => !Enum.IsDefined(c.State) || c.State == TcpConnectionState.None)
+            .ToList();
+
+        foreach (var c in unnamed)
+        {
+            output.WriteLine(
+                $"unnamed state {(int)c.State} on {c.LocalAddress}:{c.LocalPort} " +
+                $"-> {c.RemoteAddress}:{c.RemotePort}");
+        }
+
+        // A row with a peer and an uninterpretable state is left as None on purpose, so
+        // this asserts on the listeners only: those are the ones we can reason about.
+        Assert.DoesNotContain(unnamed, c => c.RemotePort == 0);
+    }
+
+    [Fact]
+    public void A_listener_is_reported_as_listening_whatever_the_kernel_says()
+    {
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        socket.Listen(16);
+
+        var port = ((IPEndPoint)socket.LocalEndPoint!).Port;
+
+        // This exact socket is the one the kernel reports as state 0, which is what the
+        // normalisation exists for. Testing it through a socket the test just created
+        // keeps the check honest: there is no doubt about what state it is really in.
+        var row = Assert.Single(
+            _reader.ReadAll(),
+            c => c.Protocol == TransportProtocol.Tcp &&
+                 c.ProcessId == Environment.ProcessId &&
+                 c.LocalPort == port);
+
+        Assert.Equal(TcpConnectionState.Listen, row.State);
+        Assert.True(row.IsListener);
+    }
+
+    [Fact]
     public void Ports_are_in_range()
     {
         var connections = _reader.ReadAll();

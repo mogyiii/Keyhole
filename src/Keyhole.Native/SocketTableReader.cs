@@ -38,7 +38,7 @@ public sealed class SocketTableReader : ISocketTableReader
                 LocalPort = DecodePort(row.localPort),
                 RemoteAddress = new IPAddress(row.remoteAddr),
                 RemotePort = DecodePort(row.remotePort),
-                State = (TcpConnectionState)row.state,
+                State = DecodeState(row.state, hasPeer: row.remotePort != 0),
             });
 
     private static IEnumerable<NetworkConnection> ReadTcp6() =>
@@ -54,7 +54,7 @@ public sealed class SocketTableReader : ISocketTableReader
                 LocalPort = DecodePort(row.localPort),
                 RemoteAddress = new IPAddress(row.remoteAddr, row.remoteScopeId),
                 RemotePort = DecodePort(row.remotePort),
-                State = (TcpConnectionState)row.state,
+                State = DecodeState(row.state, hasPeer: row.remotePort != 0),
             });
 
     private static IEnumerable<NetworkConnection> ReadUdp4() =>
@@ -165,6 +165,36 @@ public sealed class SocketTableReader : ISocketTableReader
         }
 
         return rows;
+    }
+
+    /// <summary>
+    /// Turns the raw dwState into a state Keyhole can show.
+    ///
+    /// The kernel does not always report one. MIB_TCP_STATE runs from 1 to 12, but
+    /// GetExtendedTcpTable returns 0 for some listening sockets — verified by binding a
+    /// socket, calling listen(), and hexdumping its row together with its neighbours: the
+    /// struct offsets are right (the address, port and owning pid all decode correctly,
+    /// and the next row's state reads 5) and the state field really holds zero. Other
+    /// listeners in the same table report 2. The same was true in the listener-only
+    /// table, where every row is a listener by construction.
+    ///
+    /// A row with no peer is a listening socket regardless of what the state field says —
+    /// that is what having no remote endpoint means. So an uninterpretable state on such a
+    /// row is reported as Listen. Reported, not guessed: this only fills in a value the
+    /// enum cannot express, and never overrides a state the kernel did supply.
+    ///
+    /// An uninterpretable state on a row that <em>does</em> have a peer is left as None.
+    /// There is nothing to infer there, and inventing a state would be worse than
+    /// admitting ignorance.
+    /// </summary>
+    private static TcpConnectionState DecodeState(uint raw, bool hasPeer)
+    {
+        if (raw is >= (uint)TcpConnectionState.Closed and <= (uint)TcpConnectionState.DeleteTcb)
+        {
+            return (TcpConnectionState)raw;
+        }
+
+        return hasPeer ? TcpConnectionState.None : TcpConnectionState.Listen;
     }
 
     /// <summary>
