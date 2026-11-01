@@ -38,6 +38,12 @@ public static class IpcMethods
     /// <summary>Connections for one application, for the drill-down view.</summary>
     public const string ListFlows = "list-flows";
 
+    /// <summary>
+    /// Aggregated per-destination view: which hosts are getting the most traffic,
+    /// regardless of which application sent it.
+    /// </summary>
+    public const string ListHosts = "list-hosts";
+
     /// <summary>Machine-wide throughput history for the dashboard graph.</summary>
     public const string GetThroughput = "get-throughput";
 
@@ -202,6 +208,36 @@ public sealed record AppSummary
 
     /// <summary>Id of the block rule covering this app, or null when it is not blocked.</summary>
     public long? BlockedByRuleId { get; init; }
+}
+
+/// <summary>
+/// One row of the host list: a destination with everything reaching it, from every
+/// application at once.
+/// </summary>
+public sealed record HostSummary
+{
+    /// <summary>Resolved hostname, or the address when reverse DNS produced nothing.</summary>
+    public required string Host { get; init; }
+
+    /// <summary>
+    /// Addresses seen for this host. More than one is normal behind a CDN, and the count
+    /// is how the user knows the row aggregates several.
+    /// </summary>
+    public IReadOnlyList<string> Addresses { get; init; } = [];
+
+    public IReadOnlyList<int> Ports { get; init; } = [];
+
+    /// <summary>
+    /// Applications talking to this host. The interesting figure: one destination shared
+    /// by several unrelated programs is worth a second look.
+    /// </summary>
+    public IReadOnlyList<string> Applications { get; init; } = [];
+
+    public required int ActiveConnections { get; init; }
+    public required int TotalConnections { get; init; }
+    public required long BytesSent { get; init; }
+    public required long BytesReceived { get; init; }
+    public required DateTimeOffset LastActiveUtc { get; init; }
 }
 
 /// <summary>Parameters for <see cref="IpcMethods.BlockApp"/>.</summary>

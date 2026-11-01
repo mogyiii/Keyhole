@@ -75,6 +75,7 @@ try
     builder.Services.AddSingleton<IIpcMethodHandler, GetStatusHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, ListAppsHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, ListFlowsHandler>();
+    builder.Services.AddSingleton<IIpcMethodHandler, ListHostsHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, GetThroughputHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, ListRulesHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, BlockAppHandler>();

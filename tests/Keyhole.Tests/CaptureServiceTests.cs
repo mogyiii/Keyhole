@@ -177,10 +177,43 @@ public class CaptureServiceTests(ITestOutputHelper output) : IDisposable
     [Fact]
     public void Stopping_a_session_twice_is_harmless()
     {
-        var session = Service.Start(Cmd, "/c pause");
+        // Not "/c pause": with no console input redirected, pause reads end-of-file and
+        // the process exits at once, so the session is already finished before the first
+        // Stop and the assertion below depends on a race. A process that genuinely stays
+        // alive is what this test needs, because it is about stopping a *running* session.
+        var session = Service.Start(Cmd, "/c ping -n 6 127.0.0.1");
 
-        Assert.True(Service.Stop(session.Id));
-        Assert.False(Service.Stop(session.Id));
+        try
+        {
+            Assert.True(Service.Stop(session.Id));
+            Assert.False(Service.Stop(session.Id));
+        }
+        finally
+        {
+            // Stopping a capture deliberately leaves the application running, so the test
+            // has to clean up after itself.
+            Kill(session.ProcessId);
+        }
+    }
+
+    /// <summary>Ends a process this test launched, tolerating one that already exited.</summary>
+    private static void Kill(int? processId)
+    {
+        if (processId is not { } pid)
+        {
+            return;
+        }
+
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(pid);
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit(5000);
+        }
+        catch (Exception)
+        {
+            // Already gone, which is where we wanted it.
+        }
     }
 
     [Fact]

@@ -79,6 +79,13 @@ public sealed class KeyholeServiceClient(
     public Task UnblockAppAsync(long ruleId, CancellationToken ct = default) =>
         InvokeAsync<object>(IpcMethods.UnblockApp, new UnblockAppRequest { RuleId = ruleId }, ct);
 
+    /// <summary>
+    /// The per-destination view: which hosts are getting the most traffic, regardless of
+    /// which application sent it.
+    /// </summary>
+    public Task<IReadOnlyList<HostSummary>> ListHostsAsync(CancellationToken ct = default) =>
+        InvokeAsync<IReadOnlyList<HostSummary>>(IpcMethods.ListHosts, null, ct);
+
     public Task<IReadOnlyList<CaptureSummary>> ListCapturesAsync(CancellationToken ct = default) =>
         InvokeAsync<IReadOnlyList<CaptureSummary>>(IpcMethods.ListCaptures, null, ct);
 

@@ -57,3 +57,48 @@ public sealed record AppActivity
     /// <summary>PIDs currently contributing. One program can run as several processes.</summary>
     public IReadOnlyList<int> ProcessIds { get; init; } = [];
 }
+
+/// <summary>
+/// One row of the host list: everything one destination is receiving, from every
+/// application at once.
+///
+/// The app list answers "what is this program doing". This answers the same question from
+/// the other end, which is where an unexpected destination shows up: a host that three
+/// unrelated programs are all talking to is interesting in a way that none of those three
+/// programs looks interesting on its own.
+/// </summary>
+public sealed record HostActivity
+{
+    /// <summary>
+    /// The resolved hostname, or the address when reverse DNS produced nothing. This is
+    /// what rows are grouped by, so a host behind several addresses collapses into one row
+    /// and an unresolvable address still gets its own.
+    /// </summary>
+    public required string Host { get; init; }
+
+    /// <summary>
+    /// Addresses seen for this host. More than one is normal for anything behind a CDN,
+    /// and showing the count is how the user knows the row is an aggregate.
+    /// </summary>
+    public IReadOnlyList<string> Addresses { get; init; } = [];
+
+    /// <summary>Ports talked to, which is what distinguishes a web host from a mail one.</summary>
+    public IReadOnlyList<int> Ports { get; init; } = [];
+
+    /// <summary>
+    /// Applications talking to this host, by display name. The interesting number: one
+    /// destination shared by several unrelated programs is worth a second look.
+    /// </summary>
+    public IReadOnlyList<string> Applications { get; init; } = [];
+
+    public required int ActiveConnections { get; init; }
+    public required int TotalConnections { get; init; }
+    public required long BytesSent { get; init; }
+    public required long BytesReceived { get; init; }
+
+    public required DateTimeOffset FirstSeenUtc { get; init; }
+    public required DateTimeOffset LastActiveUtc { get; init; }
+
+    /// <summary>Total in both directions, which is what the list is ranked by.</summary>
+    public long TotalBytes => BytesSent + BytesReceived;
+}

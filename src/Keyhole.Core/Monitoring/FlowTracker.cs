@@ -103,7 +103,15 @@ public sealed class FlowTracker(
 
                     _active[key] = existing with
                     {
-                        Connection = connection,
+                        // An unreadable state must not erase one we already knew. The OS
+                        // table intermittently reports a state outside MIB_TCP_STATE — the
+                        // same socket can read correctly on one sample and as nothing on
+                        // the next — and overwriting on every sample made the State column
+                        // blink empty. Same reasoning as the byte totals below.
+                        Connection = connection.State == TcpConnectionState.None
+                            ? connection with { State = existing.Connection.State }
+                            : connection,
+
                         LastSeenUtc = now,
                         // Retry the name each sample: the first lookup returns null while
                         // the background query is still in flight.
@@ -276,6 +284,67 @@ public sealed class FlowTracker(
 
         return activity;
     }
+
+    /// <summary>
+    /// Collapses flows into one row per destination, across every application.
+    ///
+    /// Grouped by resolved hostname where there is one, so a service behind a dozen CDN
+    /// addresses reads as a single destination rather than a dozen anonymous ones. An
+    /// address that reverse DNS could not name keeps its own row — merging those under
+    /// some "unknown" bucket would hide exactly the rows worth looking at.
+    ///
+    /// Loopback is excluded. A machine talks to itself constantly, and those rows would
+    /// crowd out every real destination while telling the user nothing about what left
+    /// the machine.
+    /// </summary>
+    public IReadOnlyList<HostActivity> GetHostActivity()
+    {
+        return Snapshot()
+            .Where(f => !IsLocal(f.Connection.RemoteAddress))
+            .GroupBy(f => f.RemoteHostname ?? f.Connection.RemoteAddress.ToString(),
+                StringComparer.OrdinalIgnoreCase)
+            .Select(group => new HostActivity
+            {
+                Host = group.Key,
+                Addresses = group
+                    .Select(f => f.Connection.RemoteAddress.ToString())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(a => a, StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                Ports = group
+                    .Select(f => f.Connection.RemotePort)
+                    .Distinct()
+                    .OrderBy(p => p)
+                    .ToList(),
+                Applications = group
+                    .Select(f => f.Process.DisplayName)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(a => a, StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                ActiveConnections = group.Count(f => f.IsActive),
+                TotalConnections = group.Count(),
+                BytesSent = group.Sum(f => f.BytesSent),
+                BytesReceived = group.Sum(f => f.BytesReceived),
+                FirstSeenUtc = group.Min(f => f.StartedUtc),
+                LastActiveUtc = group.Max(f => f.LastSeenUtc),
+            })
+            // Ranked by volume, because "top hosts" is a question about volume. Ties break
+            // on recency so that two idle hosts do not swap places between refreshes.
+            .OrderByDescending(h => h.TotalBytes)
+            .ThenByDescending(h => h.LastActiveUtc)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Whether an address is this machine talking to itself.
+    ///
+    /// Covers IPv4 loopback, IPv6 loopback and the unspecified addresses a half-open
+    /// socket reports.
+    /// </summary>
+    private static bool IsLocal(IPAddress address) =>
+        IPAddress.IsLoopback(address) ||
+        address.Equals(IPAddress.Any) ||
+        address.Equals(IPAddress.IPv6Any);
 
     private ThroughputPoint RecordAppThroughput(string key, long sent, long received, DateTimeOffset now)
     {

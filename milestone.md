@@ -463,6 +463,22 @@ korlátozza.
 
 #### A TCP-állapot hibája — és amit nem a gyanú, hanem a mérés mutatott meg
 
+> **Utóirat.** A javítás után a `SocketTableReaderTests` még mindig flaky volt, és a trx-ből
+> kiderült, miért: a kernel **nem csak listenereknél** ad vissza nullát. Egy frissen
+> felépített loopback kapcsolat is olvasódott `None`-ként, és ugyanaz a socket egyszer 0-t,
+> másszor 2-t adott két egymást követő híváson. Tehát ez **átmeneti érték, nem a socket
+> tulajdonsága**. Ezért a `FlowTracker` most megtartja az utolsó értelmezhető állapotot
+> ahelyett, hogy minden mintavételnél felülírná — ugyanaz a minta, amit a byte-számoknál
+> már használt, és ez szünteti meg a State oszlop villogását.
+>
+> A tesztek is változtak: ami egy pillanatnyi, kívülről nem kontrollálható állapotra
+> assertált, most **azt méri, amit a teszt maga létrehozott** (mindkét végpont, a PID) és
+> az állapotról csak annyit, hogy *egy valódi állapot* legyen. Egy marshalling-hiba
+> enumon kívüli értéket ad; a szomszédos állapotra tévedés nem hiba, hanem az OS ütemezése.
+> A `SocketTableCrossCheckTests` pedig a BCL-t a Keyhole **előtt és után is** olvassa, és
+> csak azt veti össze, ami mindkettőben szerepelt — így a drift kiesik a mérésből a
+> korábbi 80%-os tolerancia helyett, ami csak elfedte.
+
 A tünet alapján a `SocketTableReader` struct-layoutja tűnt hibásnak: a `MIB_TCP_STATE` 1-től
 indul, szóval egy nulla rossz eltolásra vall. **Ez tévedés volt**, és három mérés kellett a
 kizárásához:
@@ -484,10 +500,32 @@ ugyanabban a táblában, ahol más listenerek 2-t adnak. A javítás ezért szű
 Ezzel a `SocketTableReaderTests` terhelés-érzékeny második hibája is elment — ugyanaz volt
 a gyökere. **270 teszt, mind zöld, háromszor egymás után.**
 
+### Top hostok panel ✅
+
+Az app-lista azt mondja meg, *egy program* mit csinál. Ez ugyanazt a kérdést a másik
+végéről: melyik **célpont** kapja a legtöbb forgalmat, appoktól függetlenül. Itt bukkan
+elő az, ami egyetlen app nézetében nem tűnik fel — egy host, amivel három egymással
+össze nem függő program is beszél.
+
+Három tervezési döntés, mindegyik teszttel rögzítve:
+
+- **Feloldott hostnév szerint csoportosít**, nem cím szerint. Egy CDN mögötti szolgáltatás
+  tucat címen válaszol; cím szerint csoportosítva egyetlen szolgáltatás tucat névtelen
+  célpontnak látszik, és a forgalma — ami a rangsor alapja — tucatfelé oszlik.
+- **A fel nem oldható cím megtartja a saját sorát.** Egy „unknown" gyűjtőbe összeolvasztva
+  pont azok a sorok tűnnének el, amiket érdemes megnézni: egy célpont, amit senki nem tud
+  megnevezni, érdekesebb, mint egy ismerős CDN.
+- **A loopback kimarad.** A gép folyton beszél magával, és azok a sorok minden valódi
+  célpontot kiszorítanának — miközben semmit nem mondanak arról, mi hagyta el a gépet.
+
+A rangsor a két irány összegén alapul: egy host, ahova a gép sokat **töltött fel**,
+ugyanannyira érdekes, mint ahonnan sokat letöltött.
+
+---
+
 ## Következő lépés
 
-M1–M8 kész és élesben ellenőrizve. A következő:
+M1–M8 kész és élesben ellenőrizve, a top hostok panel megvan. A következő:
 
-1. **Top hostok panel** — melyik *célpont* kapja a legtöbb forgalmat, appoktól függetlenül.
-2. **GeoIP** — ország/ASN a távoli végpontokhoz (offline MMDB, nincs hálózati hívás).
-3. **Hosszú terhelési teszt** — az egyetlen méretlen terület.
+1. **GeoIP** — ország/ASN a távoli végpontokhoz (offline MMDB, nincs hálózati hívás).
+2. **Hosszú terhelési teszt** — az egyetlen méretlen terület.

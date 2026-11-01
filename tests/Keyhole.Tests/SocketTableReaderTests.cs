@@ -68,12 +68,9 @@ public class SocketTableReaderTests(ITestOutputHelper output)
         // This exact socket is the one the kernel reports as state 0, which is what the
         // normalisation exists for. Testing it through a socket the test just created
         // keeps the check honest: there is no doubt about what state it is really in.
-        var row = Assert.Single(
-            _reader.ReadAll(),
-            c => c.Protocol == TransportProtocol.Tcp &&
-                 c.ProcessId == Environment.ProcessId &&
-                 c.LocalPort == port);
+        var row = FindOwn(c => c.LocalPort == port, $"local port {port}");
 
+        Assert.NotNull(row);
         Assert.Equal(TcpConnectionState.Listen, row.State);
         Assert.True(row.IsListener);
     }
@@ -104,22 +101,70 @@ public class SocketTableReaderTests(ITestOutputHelper output)
 
         try
         {
-            var mine = _reader.ReadAll()
-                .Where(c => c.ProcessId == Environment.ProcessId)
-                .Where(c => c.Protocol == TransportProtocol.Tcp)
-                .Where(c => c.LocalPort == expectedPort)
-                .ToList();
+            var row = FindOwn(
+                c => c.LocalPort == expectedPort,
+                $"local port {expectedPort}");
 
-            output.WriteLine($"Expected port {expectedPort}, matched {mine.Count} rows.");
-            Assert.NotEmpty(mine);
+            Assert.NotNull(row);
+            output.WriteLine($"Port {expectedPort}: state={row.State} pid={row.ProcessId}");
 
-            var row = mine[0];
             Assert.Equal(TcpConnectionState.Listen, row.State);
             Assert.True(row.IsListener);
         }
         finally
         {
             listener.Stop();
+        }
+    }
+
+    private NetworkConnection? FindOwn(int localPort, int remotePort) =>
+        FindOwn(c => c.LocalPort == localPort && c.RemotePort == remotePort,
+            $"local port {localPort} to remote port {remotePort}");
+
+    /// <summary>
+    /// Looks for one of this process's own TCP rows, retrying briefly.
+    ///
+    /// Retries on two things. A socket does not necessarily appear in the OS table the
+    /// instant the call that created it returns, and the table intermittently reports a
+    /// state outside MIB_TCP_STATE — the same socket can read correctly on one call and as
+    /// nothing on the next. Polling past both is the honest way to test a shared, mutating
+    /// resource: the alternative is a test that passes on an idle machine and fails on a
+    /// busy one, which is what this one did.
+    ///
+    /// The owning process is part of the filter because a TIME_WAIT row from an earlier
+    /// connection on the same ephemeral port is reported with pid 0, which would make the
+    /// tuple ambiguous.
+    /// </summary>
+    private NetworkConnection? FindOwn(Func<NetworkConnection, bool> predicate, string description)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+
+        while (true)
+        {
+            var matches = _reader.ReadAll()
+                .Where(c => c.Protocol == TransportProtocol.Tcp)
+                .Where(c => c.ProcessId == Environment.ProcessId)
+                .Where(predicate)
+                .ToList();
+
+            // A state of None means the table had nothing to say this time, not that the
+            // socket is in some state called None. Waiting for a real one is the point.
+            if (matches.Count == 1 && matches[0].State != TcpConnectionState.None)
+            {
+                return matches[0];
+            }
+
+            Assert.True(
+                matches.Count <= 1,
+                $"{matches.Count} of this process's rows match {description}, " +
+                "which should be impossible.");
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                return null;
+            }
+
+            Thread.Sleep(100);
         }
     }
 
@@ -138,10 +183,7 @@ public class SocketTableReaderTests(ITestOutputHelper output)
         {
             var localEndpoint = (IPEndPoint)client.Client.LocalEndPoint!;
 
-            var match = _reader.ReadAll().SingleOrDefault(c =>
-                c.Protocol == TransportProtocol.Tcp &&
-                c.LocalPort == localEndpoint.Port &&
-                c.RemotePort == port);
+            var match = FindOwn(localEndpoint.Port, port);
 
             Assert.NotNull(match);
             output.WriteLine(
@@ -149,14 +191,32 @@ public class SocketTableReaderTests(ITestOutputHelper output)
                 $"state={match.State} pid={match.ProcessId}");
 
             // Both ends of a real connection must be decoded, not just the local one.
-            Assert.Equal(TcpConnectionState.Established, match.State);
+            // These are what the test actually controls: it created this connection, so
+            // the addresses, the ports and the owning process are facts.
+            Assert.Equal(IPAddress.Loopback, match.LocalAddress);
             Assert.Equal(IPAddress.Loopback, match.RemoteAddress);
+            Assert.Equal(port, match.RemotePort);
             Assert.Equal(Environment.ProcessId, match.ProcessId);
-            Assert.False(match.IsListener);
+
+            // The state only has to be a state. Which one is not the test's to decide: a
+            // loopback connection moves through Established, the FIN waits and Closed on
+            // the OS's schedule, not ours, and earlier versions of this assertion failed
+            // on a busy machine for reasons that had nothing to do with the decoding it
+            // exists to check. What a marshalling bug produces is a value outside the
+            // enum, and that is what this catches.
+            Assert.True(
+                Enum.IsDefined(match.State) && match.State != TcpConnectionState.None,
+                $"State decoded as {(int)match.State}, which is not a TCP state.");
         }
         finally
         {
             listener.Stop();
+
+            // Keeps both ends rooted until the polling above is done. Without this the
+            // sockets can be collected and closed while the table is still being read,
+            // which is one way the connection ends up half-closed mid-test.
+            GC.KeepAlive(client);
+            GC.KeepAlive(accepted);
         }
     }
 

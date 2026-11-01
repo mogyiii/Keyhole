@@ -155,6 +155,83 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<RuleRow> Rules { get; } = [];
 
+    /// <summary>
+    /// Destinations ranked by volume, across every application.
+    ///
+    /// The app list answers "what is this program doing". This answers it from the other
+    /// end, which is where an unexpected destination shows up: a host three unrelated
+    /// programs are all talking to is interesting in a way none of the three looks on its
+    /// own.
+    /// </summary>
+    public ObservableCollection<HostRow> Hosts { get; } = [];
+
+    /// <summary>Free-text filter over the host list, matching host, app or address.</summary>
+    [ObservableProperty]
+    private string _hostSearchText = "";
+
+    partial void OnHostSearchTextChanged(string value) => ApplyHostFilter();
+
+    public ObservableCollection<HostRow> VisibleHosts { get; } = [];
+
+    /// <summary>
+    /// Syncs the visible host list in place, for the same reason the app list does: the
+    /// grid drops its selection when a row leaves the collection, and this runs on every
+    /// refresh.
+    /// </summary>
+    private void ApplyHostFilter()
+    {
+        var needle = HostSearchText.Trim();
+        var desired = Hosts.Where(h => needle.Length == 0 || h.Matches(needle)).ToList();
+
+        for (var i = VisibleHosts.Count - 1; i >= 0; i--)
+        {
+            if (!desired.Contains(VisibleHosts[i]))
+            {
+                VisibleHosts.RemoveAt(i);
+            }
+        }
+
+        for (var i = 0; i < desired.Count; i++)
+        {
+            var host = desired[i];
+            var current = VisibleHosts.IndexOf(host);
+
+            if (current < 0)
+            {
+                VisibleHosts.Insert(Math.Min(i, VisibleHosts.Count), host);
+            }
+            else if (current != i)
+            {
+                VisibleHosts.Move(current, i);
+            }
+        }
+    }
+
+    private async Task LoadHostsAsync(CancellationToken ct)
+    {
+        try
+        {
+            var hosts = await _client.ListHostsAsync(ct);
+
+            // Replaced wholesale rather than merged: the list is ranked by volume, so
+            // rows reorder constantly and there is no stable identity to preserve. The
+            // filter below restores whatever the user was looking at.
+            Hosts.Clear();
+            foreach (var host in hosts)
+            {
+                Hosts.Add(new HostRow(host));
+            }
+
+            ApplyHostFilter();
+        }
+        catch (Exception ex) when (ex is ServiceUnavailableException or ServiceCallException
+                                      or OperationCanceledException)
+        {
+            Hosts.Clear();
+            VisibleHosts.Clear();
+        }
+    }
+
     /// <summary>Points for the dashboard graph.</summary>
     [ObservableProperty]
     private IReadOnlyList<ChartPoint> _throughput = [];
@@ -256,6 +333,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             ApplyFilter();
             await LoadRulesAsync(cts.Token);
             await LoadThroughputAsync(cts.Token);
+            await LoadHostsAsync(cts.Token);
             await LoadCapturesAsync(cts.Token);
 
             State = ConnectionState.Connected;
@@ -1049,6 +1127,56 @@ public sealed class CaptureRow(CaptureSummary session)
         { IsRunning: false, KeylogBytes: 0 } => "no keys were written",
         _ => "",
     };
+}
+
+/// <summary>One destination in the Hosts tab.</summary>
+public sealed class HostRow(HostSummary host)
+{
+    public string Host { get; } = host.Host;
+
+    public string Traffic { get; } = Format.Traffic(host.BytesSent, host.BytesReceived);
+
+    public string Total { get; } = Format.Bytes(host.BytesSent + host.BytesReceived);
+
+    public string Connections { get; } = host.ActiveConnections == host.TotalConnections
+        ? host.TotalConnections.ToString()
+        : $"{host.ActiveConnections} / {host.TotalConnections}";
+
+    /// <summary>
+    /// The applications, with a count when there are several. A destination shared by
+    /// unrelated programs is the thing this tab exists to surface, so the number comes
+    /// first and the names follow.
+    /// </summary>
+    public string Applications { get; } = host.Applications.Count switch
+    {
+        0 => "",
+        1 => host.Applications[0],
+        _ => $"{host.Applications.Count}: {string.Join(", ", host.Applications)}",
+    };
+
+    public string Ports { get; } = string.Join(", ", host.Ports);
+
+    /// <summary>
+    /// The addresses, shown only when the host resolved to a name — otherwise the Host
+    /// column already is the address and repeating it says nothing.
+    /// </summary>
+    public string Addresses { get; } =
+        host.Addresses.Count == 1 && host.Addresses[0] == host.Host
+            ? ""
+            : string.Join(", ", host.Addresses);
+
+    public string LastSeen { get; } = host.LastActiveUtc.ToLocalTime().ToString("HH:mm:ss");
+
+    /// <summary>
+    /// Matches the search box against everything the row shows. Address and application
+    /// are included because "which app talks to this" and "who is at this IP" are both
+    /// reasons to search here.
+    /// </summary>
+    public bool Matches(string needle) =>
+        Host.Contains(needle, StringComparison.OrdinalIgnoreCase) ||
+        Applications.Contains(needle, StringComparison.OrdinalIgnoreCase) ||
+        Addresses.Contains(needle, StringComparison.OrdinalIgnoreCase) ||
+        Ports.Contains(needle, StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>One recovered request and response in the Capture tab's request list.</summary>

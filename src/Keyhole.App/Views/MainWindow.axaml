@@ -204,6 +204,43 @@
             </Grid>
           </TabItem>
 
+          <TabItem Header="Hosts">
+            <Grid RowDefinitions="Auto,*">
+              <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="8,6,8,8">
+                <TextBlock Grid.Column="0" Classes="label" VerticalAlignment="Center"
+                           TextWrapping="Wrap" MaxWidth="430"
+                           Text="Destinations ranked by traffic, across every application. The list above answers what one program is doing; this answers it from the other end — a host several unrelated programs all talk to is worth a look. Loopback is excluded." />
+                <TextBox Grid.Column="1" Text="{Binding HostSearchText}"
+                         PlaceholderText="Search hosts, apps, addresses, ports…"
+                         Margin="16,0,0,0" MaxWidth="320" HorizontalAlignment="Left"
+                         VerticalAlignment="Center" FontSize="12" Padding="8,4" />
+              </Grid>
+
+              <TextBlock Grid.Row="1" Text="No outbound destinations yet."
+                         Classes="label" VerticalAlignment="Center" HorizontalAlignment="Center"
+                         IsVisible="{Binding !VisibleHosts.Count}" />
+
+              <DataGrid Grid.Row="1"
+                        ItemsSource="{Binding VisibleHosts}"
+                        AutoGenerateColumns="False"
+                        IsReadOnly="True"
+                        CanUserResizeColumns="True"
+                        HeadersVisibility="Column"
+                        IsVisible="{Binding VisibleHosts.Count}">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Host" Binding="{Binding Host}" Width="2.4*" />
+                  <DataGridTextColumn Header="Total" Binding="{Binding Total}" Width="100" />
+                  <DataGridTextColumn Header="Traffic" Binding="{Binding Traffic}" Width="170" />
+                  <DataGridTextColumn Header="Conns" Binding="{Binding Connections}" Width="85" />
+                  <DataGridTextColumn Header="Ports" Binding="{Binding Ports}" Width="110" />
+                  <DataGridTextColumn Header="Applications" Binding="{Binding Applications}" Width="2.2*" />
+                  <DataGridTextColumn Header="Addresses" Binding="{Binding Addresses}" Width="1.6*" />
+                  <DataGridTextColumn Header="Last seen" Binding="{Binding LastSeen}" Width="95" />
+                </DataGrid.Columns>
+              </DataGrid>
+            </Grid>
+          </TabItem>
+
           <TabItem Header="Blocked apps">
             <Grid RowDefinitions="Auto,*">
               <TextBlock Grid.Row="0" Text="{Binding LastActionMessage}" Classes="label"

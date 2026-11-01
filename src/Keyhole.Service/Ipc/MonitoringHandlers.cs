@@ -50,6 +50,48 @@ public sealed class ListAppsHandler(FlowTracker tracker, BlockingService? blocki
     };
 }
 
+/// <summary>
+/// Answers <see cref="IpcMethods.ListHosts"/> with the per-destination view.
+/// </summary>
+public sealed class ListHostsHandler(FlowTracker tracker) : IIpcMethodHandler
+{
+    public string Method => IpcMethods.ListHosts;
+
+    /// <summary>
+    /// How many hosts one answer carries. "Top hosts" is a question about the busiest
+    /// few, and the list is already ranked by volume, so a cap costs nothing the user
+    /// wanted and keeps a machine with thousands of destinations from filling a frame.
+    /// </summary>
+    private const int MaxHosts = 200;
+
+    /// <summary>
+    /// Applications and addresses listed per host. A CDN host can be reached at dozens of
+    /// addresses, and the column shows a count plus the first few either way.
+    /// </summary>
+    private const int MaxPerHost = 12;
+
+    public Task<JsonElement?> HandleAsync(JsonElement? parameters, CancellationToken ct)
+    {
+        var hosts = tracker.GetHostActivity()
+            .Take(MaxHosts)
+            .Select(h => new HostSummary
+            {
+                Host = h.Host,
+                Addresses = [.. h.Addresses.Take(MaxPerHost)],
+                Ports = [.. h.Ports.Take(MaxPerHost)],
+                Applications = [.. h.Applications.Take(MaxPerHost)],
+                ActiveConnections = h.ActiveConnections,
+                TotalConnections = h.TotalConnections,
+                BytesSent = h.BytesSent,
+                BytesReceived = h.BytesReceived,
+                LastActiveUtc = h.LastActiveUtc,
+            })
+            .ToList();
+
+        return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(hosts, IpcChannel.Json));
+    }
+}
+
 /// <summary>Answers <see cref="IpcMethods.GetThroughput"/> with the machine-wide graph history.</summary>
 public sealed class GetThroughputHandler(FlowTracker tracker) : IIpcMethodHandler
 {
