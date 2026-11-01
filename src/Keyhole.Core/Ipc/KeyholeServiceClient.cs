@@ -98,6 +98,20 @@ public sealed class KeyholeServiceClient(
     public Task StopCaptureAsync(long sessionId, CancellationToken ct = default) =>
         InvokeAsync<object>(IpcMethods.StopCapture, new StopCaptureRequest { SessionId = sessionId }, ct);
 
+    /// <summary>
+    /// Reads a session's capture and recovers the requests and responses in it.
+    ///
+    /// Slow by nature — it walks every packet and decrypts every TLS record — so callers
+    /// should allow far more time than for the other calls, and must not put it on a
+    /// refresh timer.
+    /// </summary>
+    public Task<DecodeCaptureResponse> DecodeCaptureAsync(
+        long sessionId, CancellationToken ct = default) =>
+        InvokeAsync<DecodeCaptureResponse>(
+            IpcMethods.DecodeCapture,
+            new DecodeCaptureRequest { SessionId = sessionId },
+            ct);
+
     public Task<RuleSummary> SetRuleEnabledAsync(long ruleId, bool enabled, CancellationToken ct = default) =>
         InvokeAsync<RuleSummary>(
             IpcMethods.SetRuleEnabled,

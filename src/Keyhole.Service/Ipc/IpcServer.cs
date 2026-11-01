@@ -4,6 +4,7 @@ using System.Security.Principal;
 using System.Text.Json;
 using Keyhole.Core.Blocking;
 using Keyhole.Core.Ipc;
+using Keyhole.Native.Npcap;
 using Keyhole.Service.Monitoring;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -188,12 +189,18 @@ public sealed class PingHandler : IIpcMethodHandler
 public sealed class GetStatusHandler(
     ServiceRuntimeInfo runtime,
     MonitorService? monitor = null,
-    BlockingService? blocking = null) : IIpcMethodHandler
+    BlockingService? blocking = null,
+    NpcapProbe? npcap = null) : IIpcMethodHandler
 {
     public string Method => IpcMethods.GetStatus;
 
     public Task<JsonElement?> HandleAsync(JsonElement? parameters, CancellationToken ct)
     {
+        // Probed per call rather than cached at startup: Npcap can be installed while
+        // Keyhole is running, and the whole point of the download offer is that recording
+        // starts working afterwards without a restart.
+        var packetCapture = npcap?.Detect();
+
         var status = new ServiceStatus
         {
             Version = runtime.Version,
@@ -208,6 +215,10 @@ public sealed class GetStatusHandler(
             BlockingUnavailableReason = blocking is { CanModifyRules: false }
                 ? blocking.UnavailableReason
                 : null,
+
+            PacketCaptureUnavailableReason = packetCapture?.UnavailableReason,
+            NpcapState = packetCapture?.State.ToString().ToLowerInvariant(),
+            NpcapVersion = packetCapture?.Version,
         };
 
         return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(status, IpcChannel.Json));

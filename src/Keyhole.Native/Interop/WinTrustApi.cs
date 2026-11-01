@@ -28,6 +28,65 @@ internal static partial class WinTrustApi
     [LibraryImport("wintrust.dll", EntryPoint = "WinVerifyTrust")]
     internal static partial int WinVerifyTrust(IntPtr hwnd, ref Guid actionId, IntPtr data);
 
+    /// <summary>
+    /// Walks from WinVerifyTrust's state data to the certificate that actually signed the
+    /// file. Needed because a valid signature only says someone signed it; naming the
+    /// signer is a separate question, and the only trustworthy answer comes from the
+    /// chain wintrust just built rather than from re-parsing the file.
+    ///
+    /// Valid only between VERIFY and CLOSE: the state data is freed by the CLOSE call.
+    /// </summary>
+    [LibraryImport("wintrust.dll")]
+    internal static partial IntPtr WTHelperProvDataFromStateData(IntPtr stateData);
+
+    [LibraryImport("wintrust.dll")]
+    internal static partial IntPtr WTHelperGetProvSignerFromChain(
+        IntPtr provData,
+        uint signerIndex,
+        [MarshalAs(UnmanagedType.Bool)] bool counterSigner,
+        uint counterSignerIndex);
+
+    [LibraryImport("wintrust.dll")]
+    internal static partial IntPtr WTHelperGetProvCertFromChain(IntPtr signer, uint certIndex);
+
+    /// <summary>
+    /// CRYPT_PROVIDER_SGNR, truncated after the field we need. Only csCertChain and
+    /// pasCertChain are read, and both sit before everything omitted here, so the shorter
+    /// layout is safe — and far less interop surface to get wrong.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct CRYPT_PROVIDER_SGNR_HEAD
+    {
+        public uint cbStruct;
+        public System.Runtime.InteropServices.ComTypes.FILETIME sftVerifyAsOf;
+        public uint csCertChain;
+        public IntPtr pasCertChain;
+    }
+
+    /// <summary>
+    /// CRYPT_PROVIDER_CERT, truncated after pCert for the same reason.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct CRYPT_PROVIDER_CERT_HEAD
+    {
+        public uint cbStruct;
+
+        /// <summary>PCCERT_CONTEXT for this link in the chain.</summary>
+        public IntPtr pCert;
+    }
+
+    /// <summary>CERT_NAME_SIMPLE_DISPLAY_TYPE — the name a user would recognise.</summary>
+    internal const uint CERT_NAME_SIMPLE_DISPLAY_TYPE = 4;
+
+    [LibraryImport("crypt32.dll", EntryPoint = "CertGetNameStringW", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial uint CertGetNameString(
+        IntPtr certContext,
+        uint type,
+        uint flags,
+        IntPtr typeParameter,
+        Span<char> nameString,
+        uint nameStringSize);
+
     [StructLayout(LayoutKind.Sequential)]
     internal struct WINTRUST_FILE_INFO
     {

@@ -240,6 +240,117 @@ finally {
     Remove-Item $testExe -ErrorAction SilentlyContinue
 }
 
+# --- 4. Packet capture and TLS decoding (M8) --------------------------------
+
+Write-Host "`nPacket capture (Npcap)" -ForegroundColor Cyan
+
+Write-Host "    npcap state: $($status.npcapState) $($status.npcapVersion)"
+Write-Check (-not $status.packetCaptureUnavailableReason) "Npcap is ready"
+
+if ($status.packetCaptureUnavailableReason) {
+    Write-Host "    reason: $($status.packetCaptureUnavailableReason)" -ForegroundColor Yellow
+    Write-Host "    Skipping the capture checks. Install Npcap to verify them." -ForegroundColor Yellow
+} else {
+    # A browser, because the point is to exercise the whole chain: an application that
+    # writes a real keylog, over real TLS, decoded by Keyhole's own pipeline. Anything on
+    # Schannel - including the curl.exe in System32 - writes no keys and would verify
+    # nothing beyond that packets were recorded.
+    $browsers = @(
+        (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),
+        (Join-Path $env:ProgramFiles 'BraveSoftware\Brave-Browser\Application\brave.exe'),
+        (Join-Path $env:ProgramFiles 'Mozilla Firefox\firefox.exe')
+    )
+    $browser = $browsers | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+    if (-not $browser) {
+        Write-Host "    No Chrome, Brave or Firefox found; cannot verify TLS decoding." -ForegroundColor Yellow
+    } else {
+        Write-Host "    using $browser"
+
+        # A fresh profile, so the run is not answered entirely out of a warm cache and so
+        # nothing touches the user's real browser state.
+        $profileDir = Join-Path $env:TEMP "keyhole-verify-profile-$([guid]::NewGuid().ToString('n'))"
+
+        # HTTP/1.1 is forced on purpose. Chrome prefers HTTP/3 over QUIC wherever a server
+        # offers it, and Keyhole cannot decode QUIC - so without this the capture would be
+        # mostly undecodable UDP and the check would fail for a reason that is documented
+        # rather than a bug.
+        # Not named $args: that is an automatic variable in PowerShell, and shadowing it
+        # is the kind of thing that works until it suddenly does not.
+        $browserArgs = "--user-data-dir=`"$profileDir`" --no-first-run --no-default-browser-check " +
+                       "--disable-quic --disable-http2 https://example.com/"
+
+        $session = Invoke-Keyhole -Method 'start-capture' -ParamsJson (@{
+            executablePath = $browser
+            arguments      = $browserArgs
+        } | ConvertTo-Json -Compress)
+
+        Write-Check ($null -ne $session.id) "start-capture returned session id $($session.id)"
+        Write-Check ($null -ne $session.pcapFile) "a packet capture was created"
+        Write-Host "    directory: $($session.directory)"
+
+        try {
+            # Long enough for the page to load and the browser to settle.
+            Write-Host "    letting the browser run for 20 seconds..."
+            Start-Sleep -Seconds 20
+
+            Invoke-Keyhole -Method 'stop-capture' -ParamsJson (@{ sessionId = $session.id } | ConvertTo-Json -Compress) | Out-Null
+
+            $listed = @(Invoke-Keyhole -Method 'list-captures') | Where-Object { $_.id -eq $session.id }
+
+            Write-Check ($listed.keylogBytes -gt 0) "the browser wrote TLS keys ($($listed.keylogBytes) bytes)"
+            Write-Check ($listed.pcapBytes -gt 0) "packets were recorded ($($listed.pcapBytes) bytes)"
+
+            # The whole point of M8: Keyhole decrypts its own capture with its own keys.
+            Write-Host "`n  Decoding the capture" -ForegroundColor Cyan
+            $decoded = Invoke-Keyhole -Method 'decode-capture' -ParamsJson (@{ sessionId = $session.id } | ConvertTo-Json -Compress)
+
+            Write-Host "    $($decoded.summary)"
+            Write-Check ($decoded.decrypted -gt 0) "TLS connections were decrypted ($($decoded.decrypted) of $($decoded.conversations))"
+            Write-Check (@($decoded.exchanges).Count -gt 0) "requests were recovered ($(@($decoded.exchanges).Count))"
+
+            @($decoded.exchanges) | Select-Object -First 8 | ForEach-Object {
+                Write-Host ("    {0,-6} {1,-4} {2}" -f $_.method, $_.statusCode, $_.url)
+            }
+
+            # Wireshark reading the same file is the independent check: it proves the
+            # capture is a real pcapng and that the embedded secrets are readable by
+            # something other than Keyhole.
+            $tshark = @(
+                (Join-Path $env:ProgramFiles 'Wireshark\tshark.exe'),
+                (Join-Path ${env:ProgramFiles(x86)} 'Wireshark\tshark.exe')
+            ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+            if ($tshark) {
+                Write-Host "`n  Wireshark reading the same capture" -ForegroundColor Cyan
+                $fields = & $tshark -r $listed.pcapFile -Y 'http.request' -T fields -e http.host -e http.request.uri 2>$null
+                $rows = @($fields | Where-Object { $_ -match '\S' })
+
+                Write-Check ($rows.Count -gt 0) "tshark decrypted the capture too ($($rows.Count) requests)"
+                $rows | Select-Object -First 5 | ForEach-Object { Write-Host "    $_" }
+            } else {
+                Write-Host "    Wireshark not installed; skipped the cross-check." -ForegroundColor Yellow
+            }
+        }
+        finally {
+            # The browser is left running by design when a capture stops, so this script
+            # has to close the one it started itself.
+            Get-Process -ErrorAction SilentlyContinue |
+                Where-Object { $_.Path -eq $browser } |
+                ForEach-Object { try { $_.CloseMainWindow() | Out-Null } catch {} }
+
+            Start-Sleep -Seconds 2
+            Get-Process -ErrorAction SilentlyContinue |
+                Where-Object { $_.Path -eq $browser } |
+                ForEach-Object { try { $_.Kill() } catch {} }
+
+            Start-Sleep -Seconds 1
+            Remove-Item $profileDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Write-Host "`nDone.`n" -ForegroundColor Green
 
 }

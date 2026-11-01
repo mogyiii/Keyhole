@@ -242,50 +242,136 @@
           </TabItem>
 
           <TabItem Header="Capture">
-            <Grid RowDefinitions="Auto,Auto,*">
+            <Grid RowDefinitions="Auto,Auto,Auto,*">
               <TextBlock Grid.Row="0" Margin="8,6,8,2" TextWrapping="Wrap" Classes="label"
-                         Text="Keyhole launches the application with SSLKEYLOGFILE set for that process only — no machine-wide variable, nothing to unset afterwards. Works with Chrome, Firefox, Electron, Node and curl; applications on Windows' own TLS stack ignore it." />
+                         Text="Keyhole launches the application with SSLKEYLOGFILE set for that process only, and records its packets alongside. The capture carries its own TLS keys, so Wireshark opens it decrypted with nothing to configure. Applications on Windows' own TLS stack write no keys and stay encrypted." />
 
-              <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="8,6,8,8">
+              <!-- Npcap's absence belongs here rather than in the strip above the app
+                   list: it affects captures only, and this is where the button that
+                   fixes it can sit next to the explanation. -->
+              <Border Grid.Row="1" Classes="card" Padding="12,7" Margin="8,6,8,2"
+                      Background="{DynamicResource WarningBackground}"
+                      BorderBrush="{DynamicResource WarningBorder}"
+                      IsVisible="{Binding HasPacketCaptureWarning}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                  <TextBlock Grid.Column="0" Text="⚠" FontSize="13" Margin="0,0,9,0"
+                             Foreground="{DynamicResource WarningIcon}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="{Binding PacketCaptureWarning}" TextWrapping="Wrap"
+                             Foreground="{DynamicResource WarningText}" FontSize="12"
+                             VerticalAlignment="Center" />
+                  <Button Grid.Column="2" Content="Get Npcap…" Padding="12,4" FontSize="12"
+                          Margin="12,0,0,0"
+                          IsVisible="{Binding CanInstallNpcap}"
+                          IsEnabled="{Binding !IsInstallingNpcap}"
+                          Command="{Binding InstallNpcapCommand}"
+                          ToolTip.Tip="Downloads the installer from npcap.com and verifies its signature before running it. Keyhole does not redistribute Npcap." />
+                </Grid>
+              </Border>
+
+              <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10" Margin="8,6,8,8">
                 <Button Content="Launch app with key logging…"
                         Command="{Binding StartCaptureCommand}" Padding="14,6" FontSize="12" />
                 <TextBlock Text="{Binding LastActionMessage}" Classes="label" TextWrapping="Wrap"
                            VerticalAlignment="Center" MaxWidth="620" />
               </StackPanel>
 
-              <TextBlock Grid.Row="2" Text="No captures yet." Classes="label"
-                         VerticalAlignment="Center" HorizontalAlignment="Center"
-                         IsVisible="{Binding !Captures.Count}" />
+              <!-- Sessions above, the requests decoded out of one of them below. The
+                   splitter lets either half take the space, because which one matters
+                   depends entirely on what the user is doing. -->
+              <Grid Grid.Row="3" RowDefinitions="*,Auto,Auto,1.3*">
 
-              <DataGrid Grid.Row="2"
-                        ItemsSource="{Binding Captures}"
-                        AutoGenerateColumns="False"
-                        IsReadOnly="True"
-                        CanUserResizeColumns="True"
-                        HeadersVisibility="Column">
-                <DataGrid.Columns>
-                  <DataGridTextColumn Header="Application" Binding="{Binding DisplayName}" Width="1.3*" />
-                  <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="95" />
-                  <DataGridTextColumn Header="Started" Binding="{Binding Started}" Width="140" />
-                  <DataGridTextColumn Header="TLS keys" Binding="{Binding KeylogSize}" Width="100" />
-                  <DataGridTextColumn Header="" Binding="{Binding Note}" Width="2.4*" />
-                  <DataGridTemplateColumn Header="" Width="170">
-                    <DataGridTemplateColumn.CellTemplate>
-                      <DataTemplate>
-                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="4,2">
-                          <Button Content="Stop" Padding="8,2" FontSize="11"
-                                  IsVisible="{Binding IsRunning}"
-                                  Command="{Binding $parent[DataGrid].((vm:MainWindowViewModel)DataContext).StopCaptureCommand}"
-                                  CommandParameter="{Binding}" />
-                          <Button Content="Open folder" Padding="8,2" FontSize="11"
-                                  Command="{Binding $parent[DataGrid].((vm:MainWindowViewModel)DataContext).OpenCaptureFolderCommand}"
-                                  CommandParameter="{Binding}" />
-                        </StackPanel>
-                      </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                  </DataGridTemplateColumn>
-                </DataGrid.Columns>
-              </DataGrid>
+                <TextBlock Grid.Row="0" Text="No captures yet." Classes="label"
+                           VerticalAlignment="Center" HorizontalAlignment="Center"
+                           IsVisible="{Binding !Captures.Count}" />
+
+                <DataGrid Grid.Row="0"
+                          ItemsSource="{Binding Captures}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserResizeColumns="True"
+                          HeadersVisibility="Column"
+                          IsVisible="{Binding Captures.Count}">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Application" Binding="{Binding DisplayName}" Width="1.3*" />
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="95" />
+                    <DataGridTextColumn Header="Started" Binding="{Binding Started}" Width="130" />
+                    <DataGridTextColumn Header="TLS keys" Binding="{Binding KeylogSize}" Width="95" />
+                    <DataGridTextColumn Header="Packets" Binding="{Binding PcapSize}" Width="95" />
+                    <DataGridTextColumn Header="" Binding="{Binding Note}" Width="2*" />
+                    <DataGridTemplateColumn Header="" Width="290">
+                      <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                          <StackPanel Orientation="Horizontal" Spacing="4" Margin="4,2">
+                            <Button Content="Stop" Padding="8,2" FontSize="11"
+                                    IsVisible="{Binding IsRunning}"
+                                    Command="{Binding $parent[DataGrid].((vm:MainWindowViewModel)DataContext).StopCaptureCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Content="Requests" Padding="8,2" FontSize="11"
+                                    IsEnabled="{Binding CanDecode}"
+                                    Command="{Binding $parent[DataGrid].((vm:MainWindowViewModel)DataContext).DecodeCaptureCommand}"
+                                    CommandParameter="{Binding}"
+                                    ToolTip.Tip="Decrypts the capture with this session's own TLS keys and lists what the application asked for." />
+                            <Button Content="Wireshark" Padding="8,2" FontSize="11"
+                                    IsEnabled="{Binding HasPcap}"
+                                    Command="{Binding $parent[DataGrid].((vm:MainWindowViewModel)DataContext).OpenInWiresharkCommand}"
+                                    CommandParameter="{Binding}"
+                                    ToolTip.Tip="Opens the capture in Wireshark. The TLS keys are inside the file, so no keylog path needs setting." />
+                            <Button Content="Folder" Padding="8,2" FontSize="11"
+                                    Command="{Binding $parent[DataGrid].((vm:MainWindowViewModel)DataContext).OpenCaptureFolderCommand}"
+                                    CommandParameter="{Binding}" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                  </DataGrid.Columns>
+                </DataGrid>
+
+                <GridSplitter Grid.Row="1" Height="8" Background="Transparent"
+                              HorizontalAlignment="Stretch" ResizeDirection="Rows"
+                              IsVisible="{Binding HasDecoded}" />
+
+                <!-- The summary is not decoration. A capture of a Schannel application
+                     decodes to nothing for a completely different reason than one full of
+                     QUIC, and an empty list alone cannot tell the two apart. -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10"
+                            Margin="8,2,8,6" IsVisible="{Binding HasDecoded}">
+                  <TextBlock Text="{Binding DecodedCapture.DisplayName}" Classes="heading"
+                             VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding DecodeSummary}" Classes="label" TextWrapping="Wrap"
+                             VerticalAlignment="Center" />
+                </StackPanel>
+
+                <DataGrid Grid.Row="3"
+                          ItemsSource="{Binding Exchanges}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserResizeColumns="True"
+                          HeadersVisibility="Column"
+                          IsVisible="{Binding Exchanges.Count}">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="100" />
+                    <DataGridTextColumn Header="Method" Binding="{Binding Method}" Width="80" />
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="70" />
+                    <DataGridTemplateColumn Header="URL" Width="3*">
+                      <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                          <!-- Headers hang off the URL cell as a tooltip: there is no room
+                               for them as columns, and they are something a user inspects
+                               one request at a time rather than scans down a list. -->
+                          <TextBlock Text="{Binding Url}" VerticalAlignment="Center"
+                                     Margin="6,0" TextTrimming="CharacterEllipsis"
+                                     ToolTip.Tip="{Binding Headers}" />
+                        </DataTemplate>
+                      </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Type" Binding="{Binding ContentType}" Width="1.2*" />
+                    <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="130" />
+                    <DataGridTextColumn Header="Took" Binding="{Binding Duration}" Width="90" />
+                    <DataGridTextColumn Header="Proto" Binding="{Binding Protocol}" Width="80" />
+                    <DataGridTextColumn Header="" Binding="{Binding Note}" Width="1.6*" />
+                  </DataGrid.Columns>
+                </DataGrid>
+              </Grid>
             </Grid>
           </TabItem>
 
@@ -308,12 +394,23 @@
                 <TextBlock Text="days" VerticalAlignment="Center" Classes="label" />
               </StackPanel>
 
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="Stop recording packets after" VerticalAlignment="Center"
+                           Classes="label" />
+                <NumericUpDown Value="{Binding MaxPcapMegabytes}" Minimum="1" Maximum="1048576"
+                               Increment="64" Width="130" FormatString="0" />
+                <TextBlock Text="MB per session" VerticalAlignment="Center" Classes="label" />
+              </StackPanel>
+
+              <TextBlock TextWrapping="Wrap" Classes="label"
+                         Text="A browser session can produce hundreds of megabytes in minutes. At the limit the packet recording stops and says so; the session keeps running and keeps collecting TLS keys. Takes effect for captures started after the service restarts." />
+
               <TextBlock Text="{Binding SettingsMessage}" Classes="label" TextWrapping="Wrap"
                          Foreground="{DynamicResource WarningText}"
                          IsVisible="{Binding SettingsMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
               <TextBlock TextWrapping="Wrap" Classes="label"
-                         Text="Flow history, rules and captures live in %ProgramData%\Keyhole. Capture folders contain TLS keys — treat them as sensitive." />
+                         Text="Flow history, rules and captures live in %ProgramData%\Keyhole. A capture folder holds the recorded packets and the TLS keys that decrypt them, in one place — treat it as sensitive as the traffic itself." />
             </StackPanel>
             </ScrollViewer>
           </TabItem>

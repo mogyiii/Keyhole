@@ -18,9 +18,38 @@ internal static partial class ServiceApi
 
     internal const int ERROR_MORE_DATA = 234;
 
+    /// <summary>Enough to read one service's state without the right to control it.</summary>
+    internal const uint SERVICE_QUERY_STATUS = 0x0004;
+
+    /// <summary>SERVICE_STATUS.dwCurrentState values Keyhole distinguishes.</summary>
+    internal const uint SERVICE_STOPPED = 0x00000001;
+    internal const uint SERVICE_START_PENDING = 0x00000002;
+    internal const uint SERVICE_STOP_PENDING = 0x00000003;
+    internal const uint SERVICE_RUNNING = 0x00000004;
+
     [LibraryImport("advapi32.dll", EntryPoint = "OpenSCManagerW", SetLastError = true,
         StringMarshalling = StringMarshalling.Utf16)]
     internal static partial IntPtr OpenSCManager(string? machineName, string? databaseName, uint desiredAccess);
+
+    [LibraryImport("advapi32.dll", EntryPoint = "OpenServiceW", SetLastError = true,
+        StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial IntPtr OpenService(IntPtr serviceManager, string serviceName, uint desiredAccess);
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool QueryServiceStatus(IntPtr service, out SERVICE_STATUS status);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct SERVICE_STATUS
+    {
+        public uint dwServiceType;
+        public uint dwCurrentState;
+        public uint dwControlsAccepted;
+        public uint dwWin32ExitCode;
+        public uint dwServiceSpecificExitCode;
+        public uint dwCheckPoint;
+        public uint dwWaitHint;
+    }
 
     [LibraryImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

@@ -26,8 +26,24 @@ public sealed record KeyholeSettings
     /// <summary>"auto", "light" or "dark".</summary>
     public string Theme { get; init; } = "auto";
 
+    /// <summary>
+    /// How large one capture session's packet file may grow, in megabytes.
+    ///
+    /// A browser session produces hundreds of megabytes in minutes, so this needs a
+    /// ceiling. Reaching it stops the recording and says so; the session itself keeps
+    /// running and keeps collecting TLS keys.
+    /// </summary>
+    public int MaxPcapMegabytes { get; init; } = 512;
+
     [JsonIgnore]
     public TimeSpan Retention => TimeSpan.FromDays(Math.Clamp(RetentionDays, 1, 3650));
+
+    /// <summary>
+    /// The capture ceiling in bytes. Clamped rather than validated: a nonsensical value in
+    /// a hand-edited settings file should land on something workable, not stop captures.
+    /// </summary>
+    [JsonIgnore]
+    public long MaxPcapBytes => Math.Clamp(MaxPcapMegabytes, 1, 1024 * 1024) * 1024L * 1024L;
 }
 
 /// <summary>Loads and saves <see cref="KeyholeSettings"/>, tolerating a missing or broken file.</summary>

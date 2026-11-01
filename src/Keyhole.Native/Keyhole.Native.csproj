@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" />
+    <!-- Managed bindings for Npcap's capture API. Npcap itself is not redistributed. -->
+    <PackageReference Include="SharpPcap" />
   </ItemGroup>
 
   <ItemGroup>

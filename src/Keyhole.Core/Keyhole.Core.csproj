@@ -7,6 +7,14 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <!-- Header parsing only. The capture driver binding lives in Keyhole.Native, but
+         deciding whether a packet belongs to the captured application, and reassembling
+         its TCP streams, are both decisions and belong with the testable code. -->
+    <PackageReference Include="PacketDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Keyhole.Tests" />
   </ItemGroup>
 
 </Project>

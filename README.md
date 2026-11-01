@@ -7,7 +7,7 @@ Wireshark mélységét egy helyen, kézi `SSLKEYLOGFILE` kapcsolgatás nélkül.
 
 A részletes terv és az aktuális állapot: [`milestone.md`](milestone.md).
 
-**Jelenleg:** M1–M7 kész. Telepítés és korlátok: [`RELEASE.md`](RELEASE.md).
+**Jelenleg:** M1–M8 kész. Telepítés és korlátok: [`RELEASE.md`](RELEASE.md).
 
 ## Felépítés
 
@@ -38,7 +38,13 @@ futna elevated módban, minden UI-bug admin-jogosultságú lenne, és minden ind
 - **Blokkolás egy kattintással** — Windows tűzfalszabály, ami túléli az újraindítást;
   a szabály a létrehozáskori SHA-256-ot is elmenti, és jelez, ha a bináris megváltozott
 - **TLS-láthatóság kézi env-var nélkül** — a Keyhole indítja az appot `SSLKEYLOGFILE`-lal,
-  ami **csak annak a folyamatnak** a környezetében létezik; a keylog mehet a Wiresharkba
+  ami **csak annak a folyamatnak** a környezetében létezik
+- **Csomagrögzítés a célfolyamatra szűkítve** — a session alatt, a kulcsokkal egy pcapng
+  fájlba; a Wireshark így magától visszafejtve nyitja meg, nincs keylog-útvonalat beállítani
+  (Npcap kell hozzá, amit a Keyhole nem terjeszt, csak felajánl)
+- **Kérés/válasz nézet a UI-ban** — a Keyhole a saját kulcsaival visszafejti a saját
+  felvételét: metódus, URL, státusz, fejlécek, méret, idő. HTTP/1.1 és HTTP/2 (HPACK);
+  a QUIC/HTTP3 rögzítve van, de nem dekódolható, és ezt a UI kiírja
 
 ## Fejlesztés
 
@@ -74,7 +80,9 @@ felhasználói mappát:
 
 - `keyhole.sqlite` — forgalomtörténet, folyamatok, szabályok, capture-session-ök
 - `logs/` — napi rotált Serilog fájlok, 14 nap
-- `captures/` — session-önként egy mappa a pcap és a TLS keylog fájllal
+- `captures/` — session-önként egy mappa: `capture.pcapng` és `sslkeys.log`
 
-> ⚠️ A `captures/` mappa visszafejtett forgalmat és TLS-kulcsokat tartalmaz. A `.gitignore` kizárja,
-> de megosztás előtt is érdemes meggondolni, mi van benne.
+> ⚠️ A `capture.pcapng` **a rögzített forgalmat és a visszafejtéséhez szükséges kulcsokat is
+> tartalmazza, egy fájlban** — ez az, ami miatt a Wireshark azonnal olvassa. Ugyanezért elég
+> ez az egy fájl ahhoz, hogy valaki mindent elolvasson, amit az adott app küldött: jelszót,
+> tokent, sütit. A `.gitignore` kizárja, de a megosztás ennél nagyobb kérdés.

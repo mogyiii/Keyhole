@@ -29,6 +29,14 @@
     <PackageVersion Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="4.0.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Packet capture">
+    <!-- Npcap itself is not shipped: its free licence forbids redistribution, so Keyhole
+         detects it and offers to fetch the vendor's installer. These two are only the
+         managed bindings, and both are BSD-licensed. -->
+    <PackageVersion Include="SharpPcap" Version="6.3.1" />
+    <PackageVersion Include="PacketDotNet" Version="1.4.8" />
+  </ItemGroup>
+
   <ItemGroup Label="Storage">
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.14" />
   </ItemGroup>

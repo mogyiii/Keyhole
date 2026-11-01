@@ -11,16 +11,25 @@ namespace Keyhole.Native;
 /// </summary>
 public sealed class AuthenticodeVerifier
 {
-    private readonly Dictionary<CacheKey, SignatureStatus> _cache = [];
+    private readonly Dictionary<CacheKey, AuthenticodeSignature> _cache = [];
     private readonly Lock _gate = new();
 
     private const int MaxCacheEntries = 2048;
 
-    public SignatureStatus Verify(string? executablePath)
+    public SignatureStatus Verify(string? executablePath) => Describe(executablePath).Status;
+
+    /// <summary>
+    /// Verifies the signature and names the signer.
+    ///
+    /// The signer matters whenever Keyhole is about to *act* on a file rather than merely
+    /// describe it — launching a downloaded installer, for instance. "Validly signed" is
+    /// not a sufficient test there: any signed binary passes it.
+    /// </summary>
+    public AuthenticodeSignature Describe(string? executablePath)
     {
         if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
         {
-            return SignatureStatus.Unknown;
+            return new AuthenticodeSignature(SignatureStatus.Unknown, null);
         }
 
         CacheKey key;
@@ -30,11 +39,11 @@ public sealed class AuthenticodeVerifier
         }
         catch (IOException)
         {
-            return SignatureStatus.Unknown;
+            return new AuthenticodeSignature(SignatureStatus.Unknown, null);
         }
         catch (UnauthorizedAccessException)
         {
-            return SignatureStatus.Unknown;
+            return new AuthenticodeSignature(SignatureStatus.Unknown, null);
         }
 
         lock (_gate)
@@ -45,7 +54,7 @@ public sealed class AuthenticodeVerifier
             }
         }
 
-        var status = VerifyUncached(executablePath);
+        var signature = VerifyUncached(executablePath);
 
         lock (_gate)
         {
@@ -56,13 +65,13 @@ public sealed class AuthenticodeVerifier
                 _cache.Clear();
             }
 
-            _cache[key] = status;
+            _cache[key] = signature;
         }
 
-        return status;
+        return signature;
     }
 
-    private static SignatureStatus VerifyUncached(string executablePath)
+    private static AuthenticodeSignature VerifyUncached(string executablePath)
     {
         var fileInfo = new WinTrustApi.WINTRUST_FILE_INFO
         {
@@ -97,13 +106,18 @@ public sealed class AuthenticodeVerifier
             var action = WinTrustApi.GenericVerifyV2;
             var result = WinTrustApi.WinVerifyTrust(IntPtr.Zero, ref action, dataPtr);
 
-            // Every VERIFY must be paired with a CLOSE or wintrust leaks its state block.
             var written = Marshal.PtrToStructure<WinTrustApi.WINTRUST_DATA>(dataPtr);
+
+            // Read the signer before closing: the chain wintrust just built lives in the
+            // state data, and CLOSE frees it.
+            var signer = result == 0 ? ReadSignerName(written.hWVTStateData) : null;
+
+            // Every VERIFY must be paired with a CLOSE or wintrust leaks its state block.
             written.dwStateAction = WinTrustApi.WTD_STATEACTION_CLOSE;
             Marshal.StructureToPtr(written, dataPtr, false);
             WinTrustApi.WinVerifyTrust(IntPtr.Zero, ref action, dataPtr);
 
-            return result switch
+            var status = result switch
             {
                 0 => SignatureStatus.Valid,
                 WinTrustApi.TRUST_E_NOSIGNATURE => SignatureStatus.Unsigned,
@@ -115,10 +129,12 @@ public sealed class AuthenticodeVerifier
                 // unsigned and must not be flattened into it.
                 _ => SignatureStatus.Invalid,
             };
+
+            return new AuthenticodeSignature(status, signer);
         }
         catch (Exception)
         {
-            return SignatureStatus.Unknown;
+            return new AuthenticodeSignature(SignatureStatus.Unknown, null);
         }
         finally
         {
@@ -128,5 +144,89 @@ public sealed class AuthenticodeVerifier
         }
     }
 
+    /// <summary>
+    /// The leaf certificate's display name from the chain wintrust built, or null when the
+    /// chain cannot be walked.
+    ///
+    /// Index 0 of the first signer's chain is the signing certificate itself; the rest of
+    /// the chain is its issuers, which say nothing about who signed.
+    /// </summary>
+    private static string? ReadSignerName(IntPtr stateData)
+    {
+        if (stateData == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        var providerData = WinTrustApi.WTHelperProvDataFromStateData(stateData);
+        if (providerData == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        var signer = WinTrustApi.WTHelperGetProvSignerFromChain(providerData, 0, false, 0);
+        if (signer == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        var header = Marshal.PtrToStructure<WinTrustApi.CRYPT_PROVIDER_SGNR_HEAD>(signer);
+        if (header.csCertChain == 0)
+        {
+            return null;
+        }
+
+        var providerCert = WinTrustApi.WTHelperGetProvCertFromChain(signer, 0);
+        if (providerCert == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        var certHeader = Marshal.PtrToStructure<WinTrustApi.CRYPT_PROVIDER_CERT_HEAD>(providerCert);
+        if (certHeader.pCert == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        // First call sizes the buffer; the count includes the terminating null.
+        var required = WinTrustApi.CertGetNameString(
+            certHeader.pCert, WinTrustApi.CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, IntPtr.Zero, [], 0);
+
+        if (required <= 1)
+        {
+            return null;
+        }
+
+        Span<char> buffer = required <= 256 ? stackalloc char[(int)required] : new char[required];
+
+        var written = WinTrustApi.CertGetNameString(
+            certHeader.pCert, WinTrustApi.CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, IntPtr.Zero,
+            buffer, required);
+
+        return written <= 1 ? null : new string(buffer[..((int)written - 1)]);
+    }
+
     private readonly record struct CacheKey(string Path, DateTime LastWriteUtc);
+}
+
+/// <summary>
+/// A signature verdict together with who signed, when that could be determined.
+/// </summary>
+/// <param name="Status">Whether the signature holds over the bytes on disk.</param>
+/// <param name="SignerName">
+/// The signing certificate's display name, or null when unsigned or unreadable. Only
+/// meaningful alongside a <see cref="SignatureStatus.Valid"/> status — a name read from a
+/// signature that does not verify proves nothing.
+/// </param>
+public sealed record AuthenticodeSignature(SignatureStatus Status, string? SignerName)
+{
+    /// <summary>
+    /// Whether this file verifies <em>and</em> was signed by one of the named
+    /// organisations. Both halves are required: the first alone accepts any signed
+    /// binary, the second alone accepts a forged subject on a broken signature.
+    /// </summary>
+    public bool IsSignedBy(params string[] expected) =>
+        Status == SignatureStatus.Valid &&
+        SignerName is { } name &&
+        expected.Any(e => name.Contains(e, StringComparison.OrdinalIgnoreCase));
 }

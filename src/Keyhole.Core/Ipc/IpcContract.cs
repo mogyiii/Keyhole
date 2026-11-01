@@ -61,6 +61,13 @@ public static class IpcMethods
 
     /// <summary>Every capture session, running and finished.</summary>
     public const string ListCaptures = "list-captures";
+
+    /// <summary>
+    /// Decodes a session's packet capture into the requests and responses it holds.
+    /// Separate from listing because it reads the whole capture file, which for a long
+    /// session takes long enough that it must not be part of a routine refresh.
+    /// </summary>
+    public const string DecodeCapture = "decode-capture";
 }
 
 public sealed record IpcRequest
@@ -129,6 +136,24 @@ public sealed record ServiceStatus
     /// disable the block button with an explanation instead of failing on click.
     /// </summary>
     public string? BlockingUnavailableReason { get; init; }
+
+    /// <summary>
+    /// Why packet recording is unavailable, or null when it works.
+    ///
+    /// Reported separately from the other two because its cause is different in kind:
+    /// those need elevation, this needs Npcap, which Keyhole does not ship and cannot
+    /// install on the user's behalf. A session still logs TLS keys without it.
+    /// </summary>
+    public string? PacketCaptureUnavailableReason { get; init; }
+
+    /// <summary>
+    /// "ready", "missing", "stopped" or "unusable" — enough for the UI to decide whether
+    /// offering to download Npcap would actually help.
+    /// </summary>
+    public string? NpcapState { get; init; }
+
+    /// <summary>Installed Npcap version, when it reports one.</summary>
+    public string? NpcapVersion { get; init; }
 }
 
 /// <summary>Parameters for <see cref="IpcMethods.ListFlows"/>.</summary>
@@ -240,7 +265,88 @@ public sealed record CaptureSummary
 
     /// <summary>"likely" or "unknown" — whether this executable tends to honour the variable.</summary>
     public required string KeylogSupport { get; init; }
+
+    /// <summary>
+    /// This session's packet capture, or null when none was recorded. A session with keys
+    /// but no packets is what every capture was before M8, and is still what happens on a
+    /// machine without Npcap.
+    /// </summary>
+    public string? PcapFile { get; init; }
+
+    /// <summary>Size of the capture file on disk.</summary>
+    public long PcapBytes { get; init; }
+
+    /// <summary>
+    /// Why this session is not recording packets, or null when it is. Carries the reason
+    /// all the way to the UI so a keylog-only session explains itself instead of showing
+    /// an empty packet count.
+    /// </summary>
+    public string? RecordingIssue { get; init; }
 }
+
+/// <summary>Parameters for <see cref="IpcMethods.DecodeCapture"/>.</summary>
+public sealed record DecodeCaptureRequest
+{
+    public required long SessionId { get; init; }
+}
+
+/// <summary>
+/// Answer to <see cref="IpcMethods.DecodeCapture"/>: what the application actually asked
+/// for, and an account of whatever could not be read.
+/// </summary>
+public sealed record DecodeCaptureResponse
+{
+    public IReadOnlyList<ExchangeSummary> Exchanges { get; init; } = [];
+
+    /// <summary>A sentence summarising the pass, for the UI to show above the list.</summary>
+    public required string Summary { get; init; }
+
+    /// <summary>TCP connections carrying TLS in the capture.</summary>
+    public int Conversations { get; init; }
+
+    /// <summary>How many of those were decrypted.</summary>
+    public int Decrypted { get; init; }
+
+    /// <summary>
+    /// How many were already open when recording started, so their handshake — and with it
+    /// the only thing that identifies them — is not in the capture.
+    /// </summary>
+    public int HandshakeMissing { get; init; }
+
+    /// <summary>
+    /// How many had a key that still opened nothing. The one figure here that means a bug
+    /// in Keyhole rather than a limit of what was recorded.
+    /// </summary>
+    public int DecryptionFailed { get; init; }
+
+    /// <summary>Why nothing could be decoded at all, or null when the pass ran.</summary>
+    public string? Failure { get; init; }
+}
+
+/// <summary>One request and its response, as the UI shows it.</summary>
+public sealed record ExchangeSummary
+{
+    public required string Protocol { get; init; }
+    public required string Method { get; init; }
+    public required string Url { get; init; }
+    public int? StatusCode { get; init; }
+    public string? ContentType { get; init; }
+    public required long RequestBytes { get; init; }
+    public required long ResponseBytes { get; init; }
+    public required DateTimeOffset RequestedUtc { get; init; }
+
+    /// <summary>Request to response, in milliseconds, or null when no response arrived.</summary>
+    public double? DurationMs { get; init; }
+
+    /// <summary>Why this exchange is only partly recovered, or null when it is whole.</summary>
+    public string? Incomplete { get; init; }
+
+    public IReadOnlyList<HeaderPair> RequestHeaders { get; init; } = [];
+    public IReadOnlyList<HeaderPair> ResponseHeaders { get; init; } = [];
+}
+
+/// <summary>One header. A pair rather than a map: order and duplicates both carry meaning.</summary>
+public sealed record HeaderPair(string Name, string Value);
 
 /// <summary>One sample of machine-wide throughput, in bytes per second.</summary>
 public sealed record ThroughputSample

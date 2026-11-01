@@ -15,6 +15,7 @@ using CommunityToolkit.Mvvm.Input;
 using Keyhole.App.Controls;
 using Keyhole.Core;
 using Keyhole.Core.Ipc;
+using Keyhole.Native.Npcap;
 
 namespace Keyhole.App.ViewModels;
 
@@ -69,6 +70,35 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>Set when rules cannot be written, so Block is disabled with an explanation.</summary>
     [ObservableProperty]
     private string? _blockingWarning;
+
+    /// <summary>
+    /// Set when packet recording is unavailable.
+    ///
+    /// Kept out of <see cref="CapabilityWarning"/> on purpose. That strip is about
+    /// elevation and sits above the application list, where it would be permanent noise
+    /// for anyone who does not use captures. This belongs in the Capture tab, next to the
+    /// feature it affects and next to the button that fixes it.
+    /// </summary>
+    [ObservableProperty]
+    private string? _packetCaptureWarning;
+
+    /// <summary>"ready", "missing", "stopped" or "unusable".</summary>
+    [ObservableProperty]
+    private string? _npcapState;
+
+    /// <summary>
+    /// Whether offering the download would help. Only for a genuinely absent install:
+    /// downloading a second copy does not start a stopped driver.
+    /// </summary>
+    public bool CanInstallNpcap => NpcapState == "missing";
+
+    public bool HasPacketCaptureWarning => PacketCaptureWarning is not null;
+
+    partial void OnPacketCaptureWarningChanged(string? value) =>
+        OnPropertyChanged(nameof(HasPacketCaptureWarning));
+
+    partial void OnNpcapStateChanged(string? value) =>
+        OnPropertyChanged(nameof(CanInstallNpcap));
 
     /// <summary>Result of the last block or unblock, shown next to the rules list.</summary>
     [ObservableProperty]
@@ -218,6 +248,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             ActiveConnections = status.ActiveConnections ?? 0;
             ByteCountingWarning = status.ByteCountingUnavailableReason;
             BlockingWarning = status.BlockingUnavailableReason;
+            PacketCaptureWarning = status.PacketCaptureUnavailableReason;
+            NpcapState = status.NpcapState;
 
             var apps = await _client.ListAppsAsync(cts.Token);
             MergeApps(apps);
@@ -360,6 +392,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             MinimiseToTray = value.MinimiseToTray;
             ResolveHostnames = value.ResolveHostnames;
             RetentionDays = value.RetentionDays;
+            MaxPcapMegabytes = value.MaxPcapMegabytes;
             StartWithWindows = StartupRegistration.IsEnabled();
         }
     }
@@ -368,6 +401,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _resolveHostnames = true;
     [ObservableProperty] private int _retentionDays = 30;
     [ObservableProperty] private bool _startWithWindows;
+    [ObservableProperty] private int _maxPcapMegabytes = 512;
 
     [ObservableProperty] private string? _settingsMessage;
 
@@ -376,6 +410,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     partial void OnResolveHostnamesChanged(bool value) => PersistSettings();
 
     partial void OnRetentionDaysChanged(int value) => PersistSettings();
+
+    partial void OnMaxPcapMegabytesChanged(int value) => PersistSettings();
 
     partial void OnStartWithWindowsChanged(bool value)
     {
@@ -395,6 +431,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             MinimiseToTray = MinimiseToTray,
             ResolveHostnames = ResolveHostnames,
             RetentionDays = RetentionDays,
+            MaxPcapMegabytes = MaxPcapMegabytes,
             StartWithWindows = StartWithWindows,
             Theme = ThemeLabel.ToLowerInvariant(),
         };
@@ -564,6 +601,189 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             LastActionMessage = "The service did not respond; the capture was not stopped.";
         }
     }
+
+    /// <summary>The requests recovered from the selected capture.</summary>
+    public ObservableCollection<ExchangeRow> Exchanges { get; } = [];
+
+    /// <summary>What the last decode pass found, shown above the request list.</summary>
+    [ObservableProperty]
+    private string? _decodeSummary;
+
+    [ObservableProperty]
+    private bool _isDecoding;
+
+    [ObservableProperty]
+    private CaptureRow? _decodedCapture;
+
+    public bool HasDecoded => DecodeSummary is not null;
+
+    partial void OnDecodeSummaryChanged(string? value) => OnPropertyChanged(nameof(HasDecoded));
+
+    /// <summary>
+    /// Decodes a session's capture into the requests it holds.
+    ///
+    /// Explicitly invoked rather than part of the refresh cycle: it reads the whole capture
+    /// file and decrypts every record, which for a browser session takes seconds, and no
+    /// amount of that belongs on a two-second timer.
+    /// </summary>
+    [RelayCommand]
+    private async Task DecodeCaptureAsync(CaptureRow? capture)
+    {
+        if (capture is null || IsDecoding)
+        {
+            return;
+        }
+
+        IsDecoding = true;
+        DecodedCapture = capture;
+        Exchanges.Clear();
+        DecodeSummary = $"Decoding {capture.DisplayName}…";
+
+        try
+        {
+            // Generous: decoding a long session is genuinely slow, and timing out on a
+            // capture that would have worked is worse than making the user wait.
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+
+            var result = await _client.DecodeCaptureAsync(capture.Id, cts.Token);
+
+            foreach (var exchange in result.Exchanges)
+            {
+                Exchanges.Add(new ExchangeRow(exchange));
+            }
+
+            DecodeSummary = result.Summary;
+        }
+        catch (ServiceCallException ex)
+        {
+            DecodeSummary = ex.Message;
+        }
+        catch (Exception ex) when (ex is ServiceUnavailableException or OperationCanceledException)
+        {
+            DecodeSummary = "The service did not finish decoding this capture.";
+        }
+        finally
+        {
+            IsDecoding = false;
+        }
+    }
+
+    /// <summary>
+    /// Opens a session's capture in Wireshark.
+    ///
+    /// One file is enough: the capture carries its own TLS secrets in a Decryption Secrets
+    /// Block, so Wireshark decrypts it with nothing configured. That is the whole point of
+    /// writing pcapng rather than classic pcap — the old workflow was to open the pcap,
+    /// then find the keylog, then paste its path into a preferences dialog.
+    /// </summary>
+    [RelayCommand]
+    private void OpenInWireshark(CaptureRow? capture)
+    {
+        if (capture?.PcapFile is not { } pcap || !File.Exists(pcap))
+        {
+            LastActionMessage = "This session recorded no packets, so there is nothing to open.";
+            return;
+        }
+
+        var wireshark = FindWireshark();
+
+        try
+        {
+            if (wireshark is null)
+            {
+                // Not installed where we looked, or installed somewhere unusual. Handing
+                // the file to the shell lets whatever is registered for .pcapng take it,
+                // which is Wireshark on any machine that has it.
+                Process.Start(new ProcessStartInfo { FileName = pcap, UseShellExecute = true });
+                LastActionMessage = $"Opened {Path.GetFileName(pcap)} with its registered application.";
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = wireshark,
+                Arguments = $"-r \"{pcap}\"",
+                UseShellExecute = false,
+            });
+
+            LastActionMessage = capture.HasKeys
+                ? "Opened in Wireshark. The TLS keys are inside the capture, so it decrypts itself."
+                : "Opened in Wireshark. This session wrote no TLS keys, so the traffic stays encrypted.";
+        }
+        catch (Exception ex)
+        {
+            LastActionMessage = $"Could not open the capture: {ex.Message}";
+        }
+    }
+
+    private static string? FindWireshark()
+    {
+        string[] candidates =
+        [
+            @"C:\Program Files\Wireshark\Wireshark.exe",
+            @"C:\Program Files (x86)\Wireshark\Wireshark.exe",
+        ];
+
+        return candidates.FirstOrDefault(File.Exists);
+    }
+
+    /// <summary>
+    /// Offers to fetch Npcap so packet recording can work.
+    ///
+    /// Keyhole does not ship Npcap — its free licence forbids redistribution — so this
+    /// downloads the vendor's own installer, checks that it really is signed by the Nmap
+    /// Project, and then hands it to the user with the normal elevation prompt. A download
+    /// that does not verify is deleted rather than run.
+    /// </summary>
+    [RelayCommand]
+    private async Task InstallNpcapAsync()
+    {
+        if (!CanInstallNpcap || IsInstallingNpcap)
+        {
+            return;
+        }
+
+        IsInstallingNpcap = true;
+        PacketCaptureWarning = $"Downloading Npcap {NpcapInstallerFetch.PinnedVersion} from npcap.com…";
+
+        try
+        {
+            var result = await new NpcapInstallerFetch().DownloadAsync();
+
+            if (!result.IsSuccess)
+            {
+                PacketCaptureWarning = result.Error;
+                return;
+            }
+
+            if (!NpcapInstallerFetch.Launch(result.InstallerPath!))
+            {
+                PacketCaptureWarning =
+                    "The Npcap installer was downloaded and verified but not started. " +
+                    $"Run it yourself from {result.InstallerPath}, or install from " +
+                    $"{NpcapInstallerFetch.HomepageUri}.";
+
+                return;
+            }
+
+            PacketCaptureWarning =
+                "Npcap's installer is running. Captures will record packets once it " +
+                "finishes — no need to restart Keyhole.";
+        }
+        catch (Exception ex)
+        {
+            PacketCaptureWarning =
+                $"Could not fetch Npcap ({ex.Message}). Install it from " +
+                $"{NpcapInstallerFetch.HomepageUri}.";
+        }
+        finally
+        {
+            IsInstallingNpcap = false;
+        }
+    }
+
+    [ObservableProperty]
+    private bool _isInstallingNpcap;
 
     /// <summary>Opens a session's folder so the pcap and keylog can be picked up by hand.</summary>
     [RelayCommand]
@@ -795,19 +1015,92 @@ public sealed class CaptureRow(CaptureSummary session)
     public string Started { get; } = session.StartedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
     public string KeylogSize { get; } = Format.Bytes(session.KeylogBytes);
 
+    public string? PcapFile { get; } = session.PcapFile;
+
+    /// <summary>
+    /// Em dash rather than "0 B" when nothing was recorded: a session with no capture at
+    /// all is a different thing from one whose capture is empty, and the distinction is
+    /// what tells the user whether Npcap is working.
+    /// </summary>
+    public string PcapSize { get; } =
+        session.PcapFile is null ? "—" : Format.Bytes(session.PcapBytes);
+
+    public bool HasPcap { get; } = session.PcapFile is not null;
+
+    public bool HasKeys { get; } = session.KeylogBytes > 0;
+
+    /// <summary>Whether there is anything to decode — packets and keys both.</summary>
+    public bool CanDecode { get; } = session.PcapFile is not null;
+
     /// <summary>
     /// Surfaced only when something is actually wrong. A running capture with an empty
     /// keylog almost always means the application uses Schannel, which ignores the
     /// variable — far more useful to say than to leave the user waiting.
+    ///
+    /// The recording issue takes precedence: if packets are not being recorded, that
+    /// explains more about what the user is looking at than the keylog does.
     /// </summary>
     public string Note { get; } = session switch
     {
+        { RecordingIssue: { } issue } => issue,
         { KeylogSupport: "unlikely" } => "uses Windows TLS, which ignores SSLKEYLOGFILE",
         { IsRunning: true, KeylogBytes: 0, KeylogSupport: "unknown" } =>
             "no keys yet — may use Windows TLS",
         { IsRunning: false, KeylogBytes: 0 } => "no keys were written",
         _ => "",
     };
+}
+
+/// <summary>One recovered request and response in the Capture tab's request list.</summary>
+public sealed class ExchangeRow(ExchangeSummary exchange)
+{
+    public string Method { get; } = exchange.Method;
+    public string Url { get; } = exchange.Url;
+    public string Protocol { get; } = exchange.Protocol;
+
+    /// <summary>
+    /// The status as text, so a request with no response reads as "—" rather than as a
+    /// zero that looks like a real status code.
+    /// </summary>
+    public string Status { get; } = exchange.StatusCode?.ToString() ?? "—";
+
+    public string ContentType { get; } = exchange.ContentType ?? "";
+
+    public string Size { get; } = exchange.ResponseBytes == 0 && exchange.RequestBytes == 0
+        ? "—"
+        : Format.Traffic(exchange.RequestBytes, exchange.ResponseBytes);
+
+    public string Duration { get; } = exchange.DurationMs switch
+    {
+        null => "—",
+        < 1000 => $"{exchange.DurationMs:F0} ms",
+        _ => $"{exchange.DurationMs.Value / 1000:F2} s",
+    };
+
+    public string Time { get; } = exchange.RequestedUtc.ToLocalTime().ToString("HH:mm:ss.fff");
+
+    public string Note { get; } = exchange.Incomplete ?? "";
+
+    /// <summary>
+    /// Headers folded into one tooltip. The grid has no room for them as columns, and a
+    /// request's headers are the thing a user drills into once rather than scans.
+    /// </summary>
+    public string Headers { get; } = BuildHeaders(exchange);
+
+    private static string BuildHeaders(ExchangeSummary exchange)
+    {
+        var lines = new List<string> { $"{exchange.Method} {exchange.Url}" };
+        lines.AddRange(exchange.RequestHeaders.Select(h => $"  {h.Name}: {h.Value}"));
+
+        if (exchange.StatusCode is { } status)
+        {
+            lines.Add("");
+            lines.Add($"{status}");
+            lines.AddRange(exchange.ResponseHeaders.Select(h => $"  {h.Name}: {h.Value}"));
+        }
+
+        return string.Join('\n', lines);
+    }
 }
 
 /// <summary>One connection in the drill-down table.</summary>

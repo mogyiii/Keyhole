@@ -29,9 +29,30 @@ programnál, ami forgalmat figyel és tűzfalszabályokat ír — ezek önmagukb
 | **UDP/QUIC célpontok (ETW)** | **admin** | a UDP-forgalom nem jelenik meg a listában |
 | **Blokkolás (tűzfal)** | **admin** | a Block gombok le vannak tiltva, a UI megindokolja |
 | TLS keylog capture | nem kell | működik |
+| **Csomagrögzítés (Npcap)** | **admin + Npcap** | a session csak TLS-kulcsokat gyűjt, a Capture fül megindokolja |
+| **TLS-dekódolás (kérés/válasz nézet)** | ugyanaz | nincs mit dekódolni csomagok nélkül |
 
 A **service** fut rendszergazdaként (LocalSystem), a **UI nem**. Ez szándékos: így nincs
 UAC-prompt minden indításnál, és egy UI-hiba sem fut emelt jogosultsággal.
+
+### Npcap: nincs a csomagban
+
+A csomagrögzítés az **Npcap** drivert igényli, ami **nincs benne a Keyhole zipjében**. Ez
+nem lustaság: az Npcap ingyenes licence kifejezetten megtiltja az újraterjesztést és a más
+szoftverrel együtt csomagolást — ahhoz fizetős OEM-engedély kell. A Keyhole ezért csak
+felismeri, és ha hiányzik, a Capture fülön felajánlja a letöltést.
+
+A **„Get Npcap…"** gomb a gyártó saját telepítőjét hozza le az `npcap.com`-ról, ellenőrzi,
+hogy valóban az Nmap Project aláírása van rajta, és csak utána indítja el — a szokásos
+UAC-prompttal, nem csendben. Ami nem megy át az ellenőrzésen, az törlődik, nem fut le.
+
+> Az Npcap ingyenes licence **5 rendszerre** korlátozza a használatot, kivéve ha csak
+> Nmap/Wireshark/Defender for Identity mellett használod. Ha ez nem elég, a gyártónál van
+> OEM-licenc. **Az aktuális feltételeket az `npcap.com`-on olvasd el, ne ebből a fájlból** —
+> ez a bekezdés egy adott napon volt igaz.
+
+Enélkül a Keyhole minden mása változatlanul működik, a TLS keylog is: pontosan annyit
+tud, amennyit M8 előtt tudott.
 
 ---
 
@@ -92,10 +113,19 @@ Minden a `%ProgramData%\Keyhole` alatt:
 | `keyhole.sqlite` | forgalomtörténet, folyamatok, szabályok, capture-session-ök |
 | `settings.json` | a Settings fül beállításai |
 | `logs\` | napi rotált naplók, 14 nap |
-| `captures\` | **TLS-kulcsok** session-önként |
+| `captures\` | **TLS-kulcsok és a rögzített forgalom** session-önként |
 
-> ⚠️ A `captures\` mappa valódi TLS-titkokat tartalmaz. Amíg egy keylog megvan, a hozzá
-> tartozó rögzített forgalom visszafejthető. Ne oszd meg, és ha végeztél, töröld.
+> ⚠️ **A `captures\` mappa M8 óta érzékenyebb, mint volt.** Korábban csak TLS-kulcsokat
+> tartalmazott, amikhez a forgalom valahol máshol volt. Most a `capture.pcapng` **a
+> forgalmat is tartalmazza, a kulcsokkal egy fájlban** — pont ezért nyitja meg a Wireshark
+> azonnal visszafejtve. Ez azt is jelenti, hogy aki megkapja ezt az egy fájlt, az mindent
+> elolvas, amit az adott alkalmazás küldött és kapott: jelszavakat, tokeneket, sütiket.
+>
+> Ne oszd meg, és ha végeztél egy session-nel, töröld az egész mappáját.
+
+A pcap mérete session-önként korlátozva van (alapértelmezés **512 MB**, a Settings fülön
+állítható). A plafonnál a rögzítés leáll és a Capture fül kiírja; a session és a
+kulcsgyűjtés megy tovább.
 
 ---
 
@@ -115,5 +145,14 @@ Minden a `%ProgramData%\Keyhole` alatt:
 - **Loopback-forgalomnál a fel/le szám megegyezik.** Ha egy kapcsolat mindkét vége ezen a
   gépen van (`127.0.0.1`), a két oldal ugyanazt a bejegyzést olvassa, így mindkettő azonos
   fel- és letöltést mutat. A valódi hálózati forgalmat ez nem érinti.
-- **Antivírus-riasztás lehetséges.** Forgalom-figyelés, ETW-session és környezeti változó
-  injektálás — aláíratlan buildnél ez együtt kiverheti a biztosítékot.
+- **A QUIC/HTTP3 forgalom nem dekódolható.** A Keyhole rögzíti, de nem fejti vissza: a QUIC
+  saját csomagvédelmet használ, a dekódolása nem a TLS-rekordok kérdése. A Chrome
+  alapértelmezésben előnyben részesíti a HTTP/3-at, ahol a szerver kínálja — ezért a
+  Capture fül kiírja, mennyi QUIC került a felvételbe, hogy egy üresebb kéréslista
+  magyarázatot kapjon, és ne hibának tűnjön.
+- **A Schannel-es appok forgalma a pcapban is titkosított marad.** Nem írnak keylogot, így
+  nincs mivel visszafejteni. A Capture fül ezt is kiírja, külön attól, amikor a dekódolás
+  hibázott.
+- **Antivírus-riasztás lehetséges.** Forgalom-figyelés, ETW-session, környezeti változó
+  injektálás és most csomagrögzítés is — aláíratlan buildnél ez együtt kiverheti a
+  biztosítékot.

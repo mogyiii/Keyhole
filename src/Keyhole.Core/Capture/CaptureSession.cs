@@ -36,6 +36,13 @@ public sealed record CaptureSession
     /// <summary>Where the target process writes its TLS secrets.</summary>
     public required string KeylogFile { get; init; }
 
+    /// <summary>
+    /// The session's packet capture, or null when Npcap was unavailable and only TLS keys
+    /// were collected. A session with keys but no packets is a normal outcome, not a
+    /// broken one — it is exactly what M5 delivered.
+    /// </summary>
+    public string? PcapFile { get; init; }
+
     public required DateTimeOffset StartedUtc { get; init; }
 
     public DateTimeOffset? StoppedUtc { get; init; }

@@ -1,10 +1,13 @@
 using Keyhole.Core;
 using Keyhole.Core.Blocking;
 using Keyhole.Core.Capture;
+using Keyhole.Core.Capture.Decode;
+using Keyhole.Core.Capture.Recording;
 using Keyhole.Core.Ipc;
 using Keyhole.Core.Monitoring;
 using Keyhole.Core.Storage;
 using Keyhole.Native;
+using Keyhole.Native.Npcap;
 using Keyhole.Service;
 using Keyhole.Service.Ipc;
 using Keyhole.Service.Monitoring;
@@ -79,10 +82,30 @@ try
     builder.Services.AddSingleton<IIpcMethodHandler, SetRuleEnabledHandler>();
 
     builder.Services.AddSingleton<SessionRepository>();
-    builder.Services.AddSingleton<CaptureService>();
+
+    // Packet capture needs Npcap, which Keyhole does not ship. The probe and the device
+    // factory both degrade to a reason rather than a throw, so a machine without Npcap
+    // runs keylog-only captures exactly as it did before M8.
+    builder.Services.AddSingleton<NpcapProbe>();
+    builder.Services.AddSingleton<IPacketDeviceFactory, SharpPcapDeviceFactory>();
+    builder.Services.AddSingleton<IProcessTreeReader, ProcessTreeReader>();
+
+    builder.Services.AddSingleton(sp => new CaptureService(
+        sp.GetRequiredService<SessionRepository>(),
+        sp.GetRequiredService<ILogger<CaptureService>>(),
+        captureRoot: null,
+        packetDevices: sp.GetRequiredService<IPacketDeviceFactory>(),
+        sockets: sp.GetRequiredService<ISocketTableReader>(),
+        processTree: sp.GetRequiredService<IProcessTreeReader>(),
+        loggerFactory: sp.GetRequiredService<ILoggerFactory>())
+    {
+        MaxPcapBytes = SettingsStore.Load().MaxPcapBytes,
+    });
+    builder.Services.AddSingleton<CaptureDecoder>();
     builder.Services.AddSingleton<IIpcMethodHandler, ListCapturesHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, StartCaptureHandler>();
     builder.Services.AddSingleton<IIpcMethodHandler, StopCaptureHandler>();
+    builder.Services.AddSingleton<IIpcMethodHandler, DecodeCaptureHandler>();
     builder.Services.AddHostedService<IpcServer>();
 
     var host = builder.Build();
@@ -132,6 +155,12 @@ try
     }
 
     await host.RunAsync();
+
+    // Captures still running when the service stops have an open pcapng and open capture
+    // adapters. Closing them here is what gets the TLS secrets written into those files;
+    // without it, a capture interrupted by a service restart would be undecryptable.
+    host.Services.GetRequiredService<CaptureService>().StopAllRecordings();
+
     return 0;
 }
 catch (Exception ex)
