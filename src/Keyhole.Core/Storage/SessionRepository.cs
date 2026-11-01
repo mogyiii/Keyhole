@@ -122,7 +122,7 @@ public sealed class SessionRepository(KeyholeDatabase database)
         Directory = reader.GetString(4),
         PcapFile = reader.IsDBNull(5) ? null : reader.GetString(5),
         KeylogFile = reader.IsDBNull(6) ? "" : reader.GetString(6),
-        StartedUtc = DateTimeOffset.Parse(reader.GetString(7)),
-        StoppedUtc = reader.IsDBNull(8) ? null : DateTimeOffset.Parse(reader.GetString(8)),
+        StartedUtc = SqliteTime.Read(reader.GetString(7)),
+        StoppedUtc = reader.IsDBNull(8) ? null : SqliteTime.Read(reader.GetString(8)),
     };
 }

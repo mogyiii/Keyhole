@@ -120,7 +120,7 @@ public sealed class RuleRepository(KeyholeDatabase database)
         Action = reader.GetString(4) == "allow" ? RuleAction.Allow : RuleAction.Block,
         IsEnabled = reader.GetInt32(5) != 0,
         Note = reader.IsDBNull(6) ? null : reader.GetString(6),
-        CreatedUtc = DateTimeOffset.Parse(reader.GetString(7)),
+        CreatedUtc = SqliteTime.Read(reader.GetString(7)),
         FirewallRuleName = reader.IsDBNull(8) ? null : reader.GetString(8),
     };
 
