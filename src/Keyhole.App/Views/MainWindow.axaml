@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:Keyhole.App.ViewModels"
         xmlns:controls="using:Keyhole.App.Controls"
+        xmlns:l="using:Keyhole.App.Localization"
         mc:Ignorable="d"
         x:Class="Keyhole.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -53,6 +54,8 @@
                    Fill="{Binding State, Converter={StaticResource StateToBrush}}" />
           <TextBlock Text="{Binding State}" Classes="heading" VerticalAlignment="Center" />
         </StackPanel>
+        <Button Content="{Binding LanguageLabel}" Command="{Binding CycleLanguageCommand}"
+                Padding="12,6" ToolTip.Tip="{l:Translate SettingsLanguage}" />
         <Button Content="{Binding ThemeLabel}" Command="{Binding CycleThemeCommand}"
                 Padding="12,6" ToolTip.Tip="Switch between auto, light and dark" />
         <Button Content="Block an app…" Command="{Binding BrowseAndBlockCommand}"

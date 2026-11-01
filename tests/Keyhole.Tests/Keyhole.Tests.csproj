@@ -19,6 +19,9 @@
     <ProjectReference Include="..\..\src\Keyhole.Core\Keyhole.Core.csproj" />
     <ProjectReference Include="..\..\src\Keyhole.Native\Keyhole.Native.csproj" />
     <ProjectReference Include="..\..\src\Keyhole.Service\Keyhole.Service.csproj" />
+    <!-- For the localization tests: they resolve strings through the real resource
+         manager, which also proves the Hungarian satellite assembly is built and found. -->
+    <ProjectReference Include="..\..\src\Keyhole.App\Keyhole.App.csproj" />
   </ItemGroup>
 
 </Project>

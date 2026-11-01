@@ -27,6 +27,15 @@ public sealed record KeyholeSettings
     public string Theme { get; init; } = "auto";
 
     /// <summary>
+    /// Interface language: "auto", "en" or "hu".
+    ///
+    /// Defaults to following Windows, which is right for almost everyone. The override
+    /// exists because it is not right for everyone: someone on a Hungarian system may
+    /// want the English interface precisely so the error text can be searched for.
+    /// </summary>
+    public string Language { get; init; } = "auto";
+
+    /// <summary>
     /// How large one capture session's packet file may grow, in megabytes.
     ///
     /// A browser session produces hundreds of megabytes in minutes, so this needs a

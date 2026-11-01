@@ -13,6 +13,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Keyhole.App.Controls;
+using Keyhole.App.Localization;
 using Keyhole.Core;
 using Keyhole.Core.Ipc;
 using Keyhole.Native.Npcap;
@@ -483,12 +484,60 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 _ => "Auto",
             };
 
+            // Set before anything else reads a string: the rest of this method and the
+            // first refresh both compose text, and they should do it in the right
+            // language rather than in English and then again.
+            Language = value.Language;
+            Loc.Current.SetCulture(AppLanguage.Resolve(value.Language));
+
             MinimiseToTray = value.MinimiseToTray;
             ResolveHostnames = value.ResolveHostnames;
             RetentionDays = value.RetentionDays;
             MaxPcapMegabytes = value.MaxPcapMegabytes;
             StartWithWindows = StartupRegistration.IsEnabled();
         }
+    }
+
+    /// <summary>
+    /// The interface's strings, in the language currently in force.
+    ///
+    /// Exposed so the view model can compose sentences in the user's language. The markup
+    /// does not go through here — it binds to the same singleton directly, because a
+    /// DataGrid column header has no data context to reach a view model through.
+    /// </summary>
+    public Loc Strings => Loc.Current;
+
+    /// <summary>"auto", "en" or "hu".</summary>
+    [ObservableProperty]
+    private string _language = AppLanguage.Automatic;
+
+    /// <summary>The label on the language button, in the language it will switch to showing.</summary>
+    public string LanguageLabel => AppLanguage.Label(Language);
+
+    partial void OnLanguageChanged(string value)
+    {
+        Loc.Current.SetCulture(AppLanguage.Resolve(value));
+
+        OnPropertyChanged(nameof(LanguageLabel));
+
+        // Every row's text was built in the old language, so the lists have to be rebuilt
+        // rather than merged: a row object caches its formatted strings at construction.
+        _ = RefreshCommand.ExecuteAsync(null);
+
+        PersistSettings();
+    }
+
+    /// <summary>
+    /// Cycles the interface language the same way the theme button cycles themes.
+    ///
+    /// A button rather than a dropdown because there are three states and the current one
+    /// is always visible on the button itself, which a collapsed dropdown is not.
+    /// </summary>
+    [RelayCommand]
+    private void CycleLanguage()
+    {
+        var index = Array.IndexOf(AppLanguage.All, Language);
+        Language = AppLanguage.All[(index + 1) % AppLanguage.All.Length];
     }
 
     [ObservableProperty] private bool _minimiseToTray = true;
@@ -528,6 +577,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             MaxPcapMegabytes = MaxPcapMegabytes,
             StartWithWindows = StartWithWindows,
             Theme = ThemeLabel.ToLowerInvariant(),
+            Language = Language,
         };
 
         try

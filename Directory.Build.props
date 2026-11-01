@@ -8,7 +8,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Globalization is on because the interface ships in English and Hungarian, and
+         invariant mode makes every culture except the invariant one unavailable: even
+         CultureInfo.GetCultureInfo("hu") throws. Windows' own NLS is used rather than
+         ICU, which is both appropriate for a Windows-only tool and keeps ICU's data out
+         of the two self-contained publishes. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
 
     <!-- No SupportedOSPlatformVersion / windows10.0.x TFM on purpose: Keyhole reaches Windows
          through P/Invoke and COM, not WinRT, so the heavier projection TFM buys nothing. -->
@@ -17,6 +22,12 @@
     <Company>Keyhole</Company>
     <Version>0.1.0</Version>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Use Windows' NLS for culture data instead of ICU. Windows-only already, and this
+         is what lets globalization be on without ICU's data in the package. -->
+    <RuntimeHostConfigurationOption Include="System.Globalization.UseNls" Value="true" />
+  </ItemGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <DebugType>embedded</DebugType>
