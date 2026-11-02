@@ -1,10 +1,10 @@
-# Keyhole 0.1.0
+# Keyhole 0.1.1
 
 Hálózati forgalom-elemző és per-alkalmazás blokkoló Windowsra. A GlassWire
 átláthatóságát és a Wireshark mélységét egy helyen, kézi `SSLKEYLOGFILE`
 kapcsolgatás nélkül.
 
-**Első kiadás.** Minden képesség valódi forgalmon ellenőrizve — a részletes
+**Első használható kiadás.** Minden képesség valódi forgalmon ellenőrizve — a részletes
 mérésekkel és a közben megtalált hibákkal együtt a [`milestone.md`](milestone.md)
 dokumentálja.
 
@@ -119,13 +119,29 @@ A monitorozás és a blokkolás rendszergazdai jogot kér; ezt a service kapja m
 
 ---
 
-**298 teszt**, a Wireshark saját eszközeivel (`tshark`, `capinfos`) való
+**314 teszt**, a Wireshark saját eszközeivel (`tshark`, `capinfos`) való
 összehasonlításokkal együtt. A TLS-visszafejtés nem körbe-teszteléssel van igazolva —
 ugyanaz a kód titkosít és fejt vissza, egy önmagában következetes félreértés minden saját
 tesztet átengedne —, hanem azzal, hogy a `tshark` ugyanabból a fájlból ugyanazt olvassa.
 
-`Keyhole-0.1.0.zip` SHA-256:
+---
+
+## Ami nyitva van
+
+**Időszakos visszafejtési hiba.** Öt éles futtatásból kettőn (a 3. és az 5.) pontosan egy
+TLS-kapcsolat került a „kulcs nem használható" vödörbe — voltak hozzá kulcsok, és a
+visszafejtés mégsem sikerült. A negyedik futtatáson egy sem. Ez **a Keyhole hibájára
+mutat**, nem a rögzítésére, és egyetlen futtatásból nem diagnosztizálható, ezért nyitva
+marad. Gyakorlati hatása: egy böngésző-session kapcsolatai közül alkalmanként egy
+olvashatatlan marad; a többi és a `tshark` ellenőrzése nem változik.
+
+**Hosszú terhelési teszt** nem futott — napokig tartó memóriahasználat és WAL-növekedés
+nincs megmérve.
+
+---
+
+`Keyhole-0.1.1.zip` SHA-256:
 
 ```
-80ed8518ca1ea5e899801cef02bc52b5a307424a5d6e1e416e876ae7654c3da7
+fe46b21b70e5e5d73229ecac38839f84dcab7d252fbf19020cc38523519d932f
 ```
