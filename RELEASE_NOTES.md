@@ -127,5 +127,5 @@ tesztet átengedne —, hanem azzal, hogy a `tshark` ugyanabból a fájlból ugy
 `Keyhole-0.1.0.zip` SHA-256:
 
 ```
-c13b75b9b266659b21996bf8a28de5c1d2a4607ccd716648a1536fb9f22c8c97
+80ed8518ca1ea5e899801cef02bc52b5a307424a5d6e1e416e876ae7654c3da7
 ```
