@@ -3,10 +3,11 @@
 > Hálózati forgalom-elemző és -szabályozó .NET alkalmazás Windowsra.
 > Cél: a GlassWire átláthatósága + a Wireshark mélysége, kézi env-var kapcsolgatás nélkül.
 
-**Állapot:** M1–M8 kész ✅ — telepítve, élesben ellenőrizve. Minden visszafejthető TLS
-kapcsolat visszafejtve valódi böngésző-forgalmon (15-ből 14; a 15. Schannel, elvileg sem
-fejthető).
-**Utolsó frissítés:** 2026-11-01
+**Állapot:** M1–M8 kész ✅ — telepítve, élesben ellenőrizve, magyar és angol felülettel.
+A negyedik futtatáson **minden visszafejthető TLS kapcsolat visszafejtve** valódi
+böngésző-forgalmon (15-ből 14; a 15. Schannel, elvileg sem fejthető). Az ötödiken viszont
+újra felbukkant **egy** „kulcs nem használható" — időszakos, nyitott, lásd lent.
+**Utolsó frissítés:** 2026-11-02
 
 ---
 
@@ -320,26 +321,46 @@ a 86-ról 270-re nőtt szám nagyrészt a HPACK és a TLS teszt-vektorai.
 ### Élesben ellenőrizve (2026-11-01)
 
 `verify-elevated.ps1` emelt jogon, telepített service-szel, friss Chrome-profillal. Négy
-futtatás, mindegyik egy hibát hozott elő és a következő mérte a javítást.
+futtatás, mindegyik egy hibát hozott elő és a következő mérte a javítást. Az **ötödik** a
+magyarítás után következett, és nem hibát keresett: azt ellenőrizte, hogy az átnevezett
+IPC-mezők és a prózát felváltó kódok élesben is átérnek.
 
-| Mi | 1. | 2. | 3. | **4.** |
-|---|---|---|---|---|
-| Npcap | `ready`, 1.78 | ugyanaz | ugyanaz | ugyanaz |
-| TLS-kulcsok | 12 752 B | 12 524 B | 12 524 B | 12 524 B |
-| Csomagok | 40,1 MB | 41,3 MB | 41,1 MB | 41,1 MB |
-| **Visszafejtve** | **5-ből 1** | **16-ból 10** | **14-ből 9** | **15-ből 14** |
-| Elszámolva | 5-ből 2 | 16-ból 12 | 14-ből 14 | 15-ből 15 |
-| „handshake nélkül" | — | 4 | 4 | **0** |
-| „kulcs nem használható" | — | — | 1 | **0** |
-| **Kérés** | **1** | **20** | **22** | **28** |
-| A betöltött oldal (`example.com`) | — | — | megjelenik | megjelenik |
-| `tshark` ugyanazon a fájlon | 1 | 23 | 29 | 30 |
+| Mi | 1. | 2. | 3. | **4.** | 5. |
+|---|---|---|---|---|---|
+| Npcap | `ready`, 1.78 | ugyanaz | ugyanaz | ugyanaz | ugyanaz |
+| TLS-kulcsok | 12 752 B | 12 524 B | 12 524 B | 12 524 B | 12 188 B |
+| Csomagok | 40,1 MB | 41,3 MB | 41,1 MB | 41,1 MB | 41,2 MB |
+| **Visszafejtve** | **5-ből 1** | **16-ból 10** | **14-ből 9** | **15-ből 14** | **22-ből 13** |
+| Elszámolva | 5-ből 2 | 16-ból 12 | 14-ből 14 | 15-ből 15 | 22-ből 22 |
+| „handshake nélkül" | — | 4 | 4 | **0** | 0 |
+| „kulcs nem használható" | — | — | 1 | **0** | 1 |
+| **Kérés** | **1** | **20** | **22** | **28** | **25** |
+| A betöltött oldal (`example.com`) | — | — | megjelenik | megjelenik | megjelenik |
+| `tshark` ugyanazon a fájlon | 1 | 23 | 29 | 30 | 26 |
 
 **A negyedik futtatás zárja le M8-at.** A maradék egyetlen visszafejtetlen kapcsolat
 helyesen „nincs kulcs" — Windows-komponens Schannellel, ami elvileg sem fejthető vissza.
 Vagyis minden visszafejthető kapcsolat visszafejtve. A 28 kérés a `tshark` 30-ához képest
 kis eltérés, és nem keresem tovább ok nélkül: a `tshark` keretekre szűr (`http.request`),
 ami nem ugyanaz a számolási konvenció, mint a kérés–válasz párosítás.
+
+**Az ötödik futtatás az IPC-szerződést igazolta,** nem a dekódolást: minden ellenőrzés
+átment, a felvétel kulcsostul olvasható, és a számok itt is pontosan összeadnak
+(13 + 8 + 0 + 1 = 22). A `geoip-none` is kódként érkezett, ahogy kell.
+
+**Ami nyitva maradt, és nem akarom szebbnek mutatni.** Ebben a futtatásban megint van
+**1 „kulcs nem használható"** — ugyanaz a vödör, ami a harmadikban is egyet mutatott és a
+negyedikben nullát. Ez a vödör definíció szerint **a Keyhole-ra mutat, nem a rögzítésre**:
+voltak kulcsok, és a visszafejtés mégsem sikerült. Vagyis **időszakos hiba**, nem
+futtatásonkénti zaj, és egyetlen futtatásból nem állapítható meg az oka — pont ezt a hibát
+követtem el korábban, amikor a 40 MB-ot az over-capture-nek tulajdonítottam. A dekódoló
+logikája a magyarítás során nem változott (csak a `DecodedExchange` szöveges mezői lettek
+kódok), szóval ez nem új. Jellemzéséhez **ismételt futtatás kell**, és addig nyitott marad.
+
+A 22 kapcsolat a negyedik futtatás 15-éhez képest, és benne a 8 kulcs nélküli, a friss
+profil pillanatnyi állapotától függ — más Chrome-komponens és más Windows-háttérszolgáltatás
+futott. Ezt **nem állítom oknak**, csak annyit, hogy a kulcs nélküli kapcsolatok mind olyan
+célpontok felé mennek, amikhez a Keyhole nem indított folyamatot.
 
 A harmadik futtatás volt az első, ahol **a számok összeadtak**: 9 visszafejtve + 4 handshake
 nélkül + 1 hibázott = 14. Innen derült ki a maradék két dolog:
@@ -610,8 +631,13 @@ M1–M8 kész és élesben ellenőrizve, a top hostok panel, a GeoIP és a magya
 
 A `plan.txt` eredeti céljai teljesültek. Ami nyitva maradt:
 
-1. **Hosszú terhelési teszt** — az egyetlen méretlen terület (memória-szivárgás,
+1. **Időszakos visszafejtési hiba** — a harmadik és az ötödik futtatáson is pontosan egy
+   kapcsolat került a „kulcs nem használható" vödörbe, a negyediken egy sem. Ez a vödör
+   **a Keyhole-ra mutat**: voltak kulcsok, és mégsem sikerült. Egy futtatásból nem
+   diagnosztizálható; ismételt futtatás kell, hogy kiderüljön, mi közös a hibázó
+   kapcsolatokban.
+2. **Hosszú terhelési teszt** — az egyetlen méretlen terület (memória-szivárgás,
    WAL-növekedés napokon át). Egyelőre tudatosan kihagyva.
-2. **MITM proxy a Schannel-appokhoz** — saját CA kellene a gépi trust store-ba, kimaradt.
-3. **Kódaláírás**, **MSI/MSIX installer**, **szabály import/export** — lásd *Mi maradt ki
+3. **MITM proxy a Schannel-appokhoz** — saját CA kellene a gépi trust store-ba, kimaradt.
+4. **Kódaláírás**, **MSI/MSIX installer**, **szabály import/export** — lásd *Mi maradt ki
    tudatosan*.

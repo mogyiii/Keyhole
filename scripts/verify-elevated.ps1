@@ -240,6 +240,14 @@ finally {
     Remove-Item $testExe -ErrorAction SilentlyContinue
 }
 
+# GeoIP is optional and its databases are the user's to supply, so this reports rather
+# than checks: an absent database is a documented state, not a failure.
+if ($status.geoIpUnavailable) {
+    Write-Host "`nGeoIP: $($status.geoIpUnavailable) (looked in $($status.geoIpDirectory))" -ForegroundColor Yellow
+} else {
+    Write-Host "`nGeoIP: country and operator lookups are available" -ForegroundColor Green
+}
+
 # --- 4. Packet capture and TLS decoding (M8) --------------------------------
 
 Write-Host "`nPacket capture (Npcap)" -ForegroundColor Cyan
