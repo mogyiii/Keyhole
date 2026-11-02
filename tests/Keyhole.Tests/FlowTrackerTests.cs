@@ -485,6 +485,9 @@ public class FlowTrackerTests
         public bool IsRunning => true;
         public string? UnavailableReason => null;
 
+        /// <summary>The same answer as a code, for the interface to translate.</summary>
+        public string? UnavailableCode => null;
+
         public ByteCounts GetCounts(ConnectionKey key) =>
             Counts.TryGetValue(key, out var counts) ? counts : ByteCounts.Zero;
 

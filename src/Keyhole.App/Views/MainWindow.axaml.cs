@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Keyhole.App.Localization;
 using Keyhole.App.ViewModels;
 
 namespace Keyhole.App.Views;
@@ -28,11 +29,13 @@ public partial class MainWindow : Window
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Choose an application to block",
+            // Deliberately not "...to block": the same picker opens for starting a
+            // capture, and a title naming one of the two is wrong half the time.
+            Title = Loc.Current["PickerTitle"],
             AllowMultiple = false,
             FileTypeFilter =
             [
-                new FilePickerFileType("Programs") { Patterns = ["*.exe"] },
+                new FilePickerFileType(Loc.Current["PickerPrograms"]) { Patterns = ["*.exe"] },
                 FilePickerFileTypes.All,
             ],
         });

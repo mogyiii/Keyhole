@@ -68,10 +68,7 @@ public sealed class GeoIpLookup : IGeoIpLookup, IDisposable
     public bool IsAvailable => _country is not null || _asn is not null;
 
     /// <summary>
-    /// What is missing, or null when both databases are loaded.
-    ///
-    /// Deliberately names the folder and the files: "GeoIP unavailable" leaves the user
-    /// with nothing to do about it.
+    /// What is missing, in English, for the log. Null when both databases are loaded.
     /// </summary>
     public string? UnavailableReason =>
         (_country, _asn) switch
@@ -83,6 +80,20 @@ public sealed class GeoIpLookup : IGeoIpLookup, IDisposable
 
             (null, _) => $"No country database in {Directory}; add {CountryFiles[0]} to see countries.",
             (_, null) => $"No ASN database in {Directory}; add {AsnFiles[0]} to see network operators.",
+            _ => null,
+        };
+
+    /// <summary>
+    /// The same answer as a code the UI can translate. The folder name travels separately
+    /// in <see cref="Directory"/>, because a path is not translatable and should not be
+    /// baked into a sentence the service composes.
+    /// </summary>
+    public string? UnavailableCode =>
+        (_country, _asn) switch
+        {
+            (null, null) => Ipc.ReasonCodes.GeoIpNoDatabase,
+            (null, _) => Ipc.ReasonCodes.GeoIpNoCountryDatabase,
+            (_, null) => Ipc.ReasonCodes.GeoIpNoAsnDatabase,
             _ => null,
         };
 
@@ -268,8 +279,14 @@ public interface IGeoIpLookup
 {
     bool IsAvailable { get; }
 
-    /// <summary>What is missing, or null when lookups work.</summary>
+    /// <summary>What is missing, in English, for the log. Null when lookups work.</summary>
     string? UnavailableReason { get; }
+
+    /// <summary>The same answer as a code the UI can translate.</summary>
+    string? UnavailableCode { get; }
+
+    /// <summary>Where the databases are looked for, so the UI can name the folder.</summary>
+    string Directory { get; }
 
     GeoIpInfo Lookup(IPAddress address);
 }
@@ -300,6 +317,10 @@ public sealed class NullGeoIpLookup(string reason) : IGeoIpLookup
     public bool IsAvailable => false;
 
     public string? UnavailableReason { get; } = reason;
+
+    public string? UnavailableCode => Ipc.ReasonCodes.GeoIpNoDatabase;
+
+    public string Directory => KeyholePaths.GeoIpDirectory;
 
     public GeoIpInfo Lookup(IPAddress address) => GeoIpInfo.Unknown;
 }

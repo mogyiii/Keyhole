@@ -66,9 +66,10 @@ public sealed class BlockAppHandler(BlockingService blocking) : IIpcMethodHandle
         }
         catch (Exception ex) when (ex is BlockingException or FirewallException)
         {
-            // These carry a user-facing explanation — missing elevation, missing file —
-            // so they must reach the UI rather than being flattened into "internal error".
-            throw new IpcInvalidParamsException(ex.Message);
+            // These carry the real reason — missing elevation, missing file — so it must
+            // reach the UI rather than being flattened into "internal error". As a code:
+            // the UI is what turns it into a sentence, in the user's language.
+            throw new IpcInvalidParamsException(BlockingFailure.CodeOf(ex));
         }
     }
 }
@@ -91,7 +92,7 @@ public sealed class UnblockAppHandler(BlockingService blocking) : IIpcMethodHand
         }
         catch (Exception ex) when (ex is BlockingException or FirewallException)
         {
-            throw new IpcInvalidParamsException(ex.Message);
+            throw new IpcInvalidParamsException(BlockingFailure.CodeOf(ex));
         }
     }
 }
@@ -114,7 +115,7 @@ public sealed class SetRuleEnabledHandler(BlockingService blocking) : IIpcMethod
         }
         catch (Exception ex) when (ex is BlockingException or FirewallException)
         {
-            throw new IpcInvalidParamsException(ex.Message);
+            throw new IpcInvalidParamsException(BlockingFailure.CodeOf(ex));
         }
     }
 }
@@ -139,4 +140,21 @@ internal static class IpcParams
             throw new IpcInvalidParamsException($"Malformed parameters: {ex.Message}");
         }
     }
+}
+
+/// <summary>
+/// The reason code behind a blocking failure.
+///
+/// Both exception types carry one, but neither shares a base class that has it — they come
+/// from different layers on purpose — so the two cases are read out here rather than in
+/// each of the three handlers.
+/// </summary>
+internal static class BlockingFailure
+{
+    public static string CodeOf(Exception ex) => ex switch
+    {
+        BlockingException blocking => blocking.Code,
+        FirewallException firewall => firewall.Code,
+        _ => ReasonCodes.BlockRuleFailed,
+    };
 }

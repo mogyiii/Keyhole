@@ -299,6 +299,9 @@ public class BlockingServiceTests : IDisposable
         public bool CanModifyRules => CanModify;
         public string? UnavailableReason => Reason;
 
+        /// <summary>The same answer as a code, for the interface to translate.</summary>
+        public string? UnavailableCode => null;
+
         public IReadOnlyList<FirewallRule> ListKeyholeRules() =>
             FailOnList ? throw new FirewallException("simulated") : Live;
 

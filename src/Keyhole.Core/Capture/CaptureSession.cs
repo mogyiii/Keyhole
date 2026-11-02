@@ -52,5 +52,17 @@ public sealed record CaptureSession
     public string DisplayName => Path.GetFileName(ExecutablePath);
 }
 
-public sealed class CaptureException(string message, Exception? inner = null)
-    : Exception(message, inner);
+/// <summary>
+/// A capture could not be started.
+/// </summary>
+/// <remarks>
+/// Carries a code as well as a message. The message is for the log, in English; the code
+/// is what reaches the interface, which has to say it in the user's language. Without the
+/// code the UI would have no choice but to display the English sentence verbatim.
+/// </remarks>
+public sealed class CaptureException(string message, string code, Exception? inner = null)
+    : Exception(message, inner)
+{
+    /// <summary>One of the capture <see cref="Ipc.ReasonCodes"/>.</summary>
+    public string Code { get; } = code;
+}

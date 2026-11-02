@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
 using Keyhole.Core.Blocking;
+using Keyhole.Core.Ipc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -52,6 +53,7 @@ public sealed class WindowsFirewall : IFirewall
         if (!IsElevated())
         {
             UnavailableReason = "Creating firewall rules needs administrator rights; the service is not elevated.";
+            UnavailableCode = ReasonCodes.NotElevated;
             return;
         }
 
@@ -65,6 +67,7 @@ public sealed class WindowsFirewall : IFirewall
         catch (Exception ex)
         {
             UnavailableReason = $"Windows Firewall is not reachable: {ex.Message}";
+            UnavailableCode = ReasonCodes.FirewallUnreachable;
             _logger.LogError(ex, "Could not reach the Windows Firewall COM API.");
         }
     }
@@ -72,6 +75,8 @@ public sealed class WindowsFirewall : IFirewall
     public bool CanModifyRules { get; }
 
     public string? UnavailableReason { get; }
+
+    public string? UnavailableCode { get; }
 
     public IReadOnlyList<FirewallRule> ListKeyholeRules()
     {
@@ -115,7 +120,8 @@ public sealed class WindowsFirewall : IFirewall
         }
         catch (Exception ex)
         {
-            throw new FirewallException("Could not enumerate firewall rules.", ex);
+            throw new FirewallException(
+                "Could not enumerate firewall rules.", ReasonCodes.BlockRuleFailed, ex);
         }
 
         return results;
@@ -171,7 +177,9 @@ public sealed class WindowsFirewall : IFirewall
         catch (Exception ex) when (ex is not FirewallException)
         {
             throw new FirewallException(
-                $"Could not apply a firewall rule for '{rule.ExecutablePath}'.", ex);
+                $"Could not apply a firewall rule for '{rule.ExecutablePath}'.",
+                ReasonCodes.BlockRuleFailed,
+                ex);
         }
     }
 
@@ -192,7 +200,10 @@ public sealed class WindowsFirewall : IFirewall
         }
         catch (Exception ex)
         {
-            throw new FirewallException($"Could not remove firewall rule '{firewallRuleName}'.", ex);
+            throw new FirewallException(
+                $"Could not remove firewall rule '{firewallRuleName}'.",
+                ReasonCodes.BlockRuleFailed,
+                ex);
         }
     }
 
@@ -235,7 +246,8 @@ public sealed class WindowsFirewall : IFirewall
         if (!CanModifyRules)
         {
             throw new FirewallException(
-                UnavailableReason ?? "Firewall rules cannot be modified.");
+                UnavailableReason ?? "Firewall rules cannot be modified.",
+                UnavailableCode ?? ReasonCodes.FirewallUnreachable);
         }
     }
 
@@ -246,10 +258,14 @@ public sealed class WindowsFirewall : IFirewall
     private static object CreateComObject(string progId)
     {
         var type = Type.GetTypeFromProgID(progId, throwOnError: false)
-                   ?? throw new FirewallException($"COM class '{progId}' is not registered.");
+                   ?? throw new FirewallException(
+                       $"COM class '{progId}' is not registered.",
+                       ReasonCodes.FirewallUnreachable);
 
         return Activator.CreateInstance(type)
-               ?? throw new FirewallException($"Could not create an instance of '{progId}'.");
+               ?? throw new FirewallException(
+                   $"Could not create an instance of '{progId}'.",
+                   ReasonCodes.FirewallUnreachable);
     }
 
     private static string? SafeString(Func<dynamic> read)

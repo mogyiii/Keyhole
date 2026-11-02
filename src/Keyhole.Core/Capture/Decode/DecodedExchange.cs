@@ -58,8 +58,9 @@ public sealed record DecodedExchange
 
     /// <summary>
     /// Set when the exchange was recovered only in part — a response still arriving when
-    /// the capture stopped, or a body the size cap truncated. Says so rather than
-    /// presenting a partial exchange as whole.
+    /// the capture stopped, or a body the size cap truncated. One of the exchange
+    /// <see cref="Ipc.ReasonCodes"/>, so the interface says it in the user's language
+    /// rather than showing a sentence the decoder composed.
     /// </summary>
     public string? Incomplete { get; init; }
 }
@@ -120,8 +121,14 @@ public sealed record DecodeResult
     /// </summary>
     public long QuicBytes { get; init; }
 
-    /// <summary>Why nothing could be decoded at all, or null when the pass ran.</summary>
+    /// <summary>
+    /// Why nothing could be decoded at all, in English, for the log. Null when the pass
+    /// ran.
+    /// </summary>
     public string? Failure { get; init; }
+
+    /// <summary>The same answer as a code the interface can translate.</summary>
+    public string? FailureCode { get; init; }
 
     /// <summary>
     /// A sentence summarising what was and was not recovered, for the UI to show above
@@ -179,5 +186,6 @@ public sealed record DecodeResult
         return string.Join("; ", parts) + ".";
     }
 
-    public static DecodeResult Failed(string reason) => new() { Failure = reason };
+    public static DecodeResult Failed(string reason, string code) =>
+        new() { Failure = reason, FailureCode = code };
 }

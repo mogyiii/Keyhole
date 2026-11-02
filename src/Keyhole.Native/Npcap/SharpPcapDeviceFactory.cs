@@ -1,4 +1,5 @@
 using Keyhole.Core.Capture;
+using Keyhole.Core.Ipc;
 using Keyhole.Core.Capture.Pcapng;
 using Keyhole.Core.Capture.Recording;
 using Microsoft.Extensions.Logging;
@@ -44,7 +45,10 @@ public sealed class SharpPcapDeviceFactory(
         var status = _probe.Detect();
         if (!status.IsReady)
         {
-            return PacketDeviceSet.Unavailable(status.Detail);
+            // Npcap's own state is already a code the interface understands, so the
+            // recording issue is simply "no Npcap" and the UI says which of the four
+            // states it is from the service status.
+            return PacketDeviceSet.Unavailable(status.Detail, ReasonCodes.RecordingNoNpcap);
         }
 
         CaptureDeviceList all;
@@ -57,7 +61,8 @@ public sealed class SharpPcapDeviceFactory(
             _logger.LogWarning(ex, "Npcap reported ready but its adapter list could not be read.");
 
             return PacketDeviceSet.Unavailable(
-                $"Npcap is installed but its adapter list could not be read: {ex.Message}");
+                $"Npcap is installed but its adapter list could not be read: {ex.Message}",
+                ReasonCodes.RecordingNoAdapter);
         }
 
         var devices = new List<IPacketDevice>();
@@ -91,13 +96,14 @@ public sealed class SharpPcapDeviceFactory(
                 failures.Count > 0
                     ? $"Npcap is running but none of its {failures.Count} adapters could be " +
                       "opened. Recording packets needs the service to be elevated."
-                    : "Npcap reported no network adapters to capture from.");
+                    : "Npcap reported no network adapters to capture from.",
+                ReasonCodes.RecordingNoAdapter);
         }
 
         _logger.LogInformation(
             "Opened {Opened} of {Total} adapters for capture.", devices.Count, all.Count);
 
-        return new PacketDeviceSet(devices, null);
+        return new PacketDeviceSet(devices, null, null);
     }
 }
 

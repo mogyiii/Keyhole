@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
 using Keyhole.Core.Capture.Decode;
+using Keyhole.Core.Ipc;
 
 namespace Keyhole.Tests;
 
@@ -108,7 +109,7 @@ public class Http2SessionTests
             Assert.Null(exchange.StatusCode);
             Assert.Null(exchange.Duration);
             Assert.NotNull(exchange.Incomplete);
-            Assert.Contains("no response", exchange.Incomplete);
+            Assert.Equal(ReasonCodes.ExchangeNoResponse, exchange.Incomplete);
         }
         finally
         {

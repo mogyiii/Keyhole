@@ -141,6 +141,48 @@ public class LocalizationTests
     }
 
     [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public void Every_code_the_service_can_send_has_a_sentence(string culture)
+    {
+        // The gap the other tests cannot see. The service sends codes and the interface
+        // phrases them, so a code added upstream without a translation here does not fail
+        // to compile and does not fail a resx comparison -- it reaches the user as the raw
+        // "recording-no-npcap". Reflection over the constants is what makes a new code
+        // show up here automatically rather than when somebody remembers to add it.
+        var codes = typeof(Keyhole.Core.Ipc.ReasonCodes)
+            .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+            .Select(f => (string)f.GetRawConstantValue()!)
+            .ToList();
+
+        Assert.NotEmpty(codes);
+
+        var loc = Keyhole.App.Localization.Loc.Current;
+        var original = loc.Culture;
+
+        try
+        {
+            loc.SetCulture(CultureInfo.GetCultureInfo(culture));
+
+            // Describe falls back to the code itself, which is the right thing to show a
+            // user and the wrong thing to ship -- so getting the code back is the failure.
+            var unphrased = codes
+                .Where(code => Keyhole.App.Localization.Reasons.Describe(code) == code)
+                .Order()
+                .ToList();
+
+            Assert.True(
+                unphrased.Count == 0,
+                $"Codes with no {culture} sentence: {string.Join(", ", unphrased)}");
+        }
+        finally
+        {
+            loc.SetCulture(original);
+        }
+    }
+
+    [Theory]
     [InlineData("en", "Language")]
     [InlineData("hu", "Nyelv")]
     public void A_key_resolves_to_the_right_language(string culture, string expected)

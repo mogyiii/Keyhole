@@ -134,6 +134,7 @@ public sealed class PacketRecording : IDisposable
         string? executablePath,
         long maxBytes,
         string? unavailableReason,
+        string? unavailableCode,
         ILogger logger)
     {
         _devices = devices;
@@ -145,10 +146,17 @@ public sealed class PacketRecording : IDisposable
         _maxBytes = maxBytes;
         _logger = logger;
         UnavailableReason = unavailableReason;
+        UnavailableCode = unavailableCode;
     }
 
-    /// <summary>Why no packets are being recorded, or null when recording is live.</summary>
+    /// <summary>
+    /// Why no packets are being recorded, in English, for the log. Null when recording is
+    /// live.
+    /// </summary>
     public string? UnavailableReason { get; }
+
+    /// <summary>The same answer as a code the interface can translate.</summary>
+    public string? UnavailableCode { get; }
 
     public bool IsRecording => _writer is not null && !_stopped && !_capReached;
 
@@ -191,14 +199,18 @@ public sealed class PacketRecording : IDisposable
         catch (Exception ex)
         {
             log.LogWarning(ex, "Could not open any capture adapter.");
-            set = PacketDeviceSet.Unavailable($"No capture adapter could be opened: {ex.Message}");
+            set = PacketDeviceSet.Unavailable(
+                $"No capture adapter could be opened: {ex.Message}",
+                Ipc.ReasonCodes.RecordingNoAdapter);
         }
 
         if (set.Devices.Count == 0)
         {
             return new PacketRecording(
                 [], null, scope, pcapngPath, rootProcessId, executablePath, maxBytes,
-                set.UnavailableReason ?? "No capture adapter was available.", log);
+                set.UnavailableReason ?? "No capture adapter was available.",
+                set.UnavailableCode ?? Ipc.ReasonCodes.RecordingNoAdapter,
+                log);
         }
 
         PcapngWriter writer;
@@ -217,12 +229,14 @@ public sealed class PacketRecording : IDisposable
 
             return new PacketRecording(
                 [], null, scope, pcapngPath, rootProcessId, executablePath, maxBytes,
-                $"The capture file could not be created: {ex.Message}", log);
+                $"The capture file could not be created: {ex.Message}",
+                Ipc.ReasonCodes.RecordingFileError,
+                log);
         }
 
         var recording = new PacketRecording(
             [.. set.Devices], writer, scope, pcapngPath, rootProcessId, executablePath,
-            maxBytes, set.UnavailableReason, log);
+            maxBytes, set.UnavailableReason, set.UnavailableCode, log);
 
         recording.Begin();
         return recording;
@@ -525,7 +539,8 @@ public sealed class PacketRecording : IDisposable
         // The secrets go in only now, because only now do they all exist — and they go in
         // ahead of the packets, which is where a reader needs them.
         var injection = string.IsNullOrWhiteSpace(keylogContents)
-            ? InjectionResult.NothingToDo("The application wrote no TLS secrets.")
+            ? InjectionResult.NothingToDo(
+                "The application wrote no TLS secrets.", Ipc.ReasonCodes.RecordingNoSecrets)
             : PcapngSecretsInjector.Inject(_pcapngPath, keylogContents!);
 
         _logger.LogInformation(
@@ -534,7 +549,10 @@ public sealed class PacketRecording : IDisposable
 
         return new RecordingSummary(
             _pcapngPath, packets, bytes, _capReached, injection.Succeeded, injection.Detail,
-            Interlocked.Read(ref _packetsConsidered));
+            Interlocked.Read(ref _packetsConsidered))
+        {
+            DetailCode = injection.DetailCode,
+        };
     }
 
     /// <summary>
@@ -543,7 +561,10 @@ public sealed class PacketRecording : IDisposable
     /// </summary>
     private RecordingSummary NothingRecorded() => new(
         PcapngPath, 0, 0, _capReached, false, UnavailableReason,
-        Interlocked.Read(ref _packetsConsidered));
+        Interlocked.Read(ref _packetsConsidered))
+    {
+        DetailCode = UnavailableCode,
+    };
 
     public void Dispose() => Stop(null);
 }
@@ -560,7 +581,11 @@ public sealed class PacketRecording : IDisposable
 /// Whether the TLS secrets are inside the capture file. When true it opens decrypted with
 /// nothing configured; when false the keylog beside it still has them.
 /// </param>
-/// <param name="Detail">A sentence for the user when something is worth saying.</param>
+/// <param name="Detail">An English sentence for the log when something is worth saying.</param>
+/// <param name="DetailCode">
+/// The same answer as a code the UI can translate, from <see cref="Pcapng.PcapngWriter"/>'s
+/// caller. Null when there is nothing to report.
+/// </param>
 /// <param name="PacketsConsidered">
 /// Packets seen across all adapters before scoping. Compared against
 /// <paramref name="Packets"/> it shows how much of the machine's traffic was discarded,
@@ -573,4 +598,10 @@ public sealed record RecordingSummary(
     bool CapReached,
     bool SecretsEmbedded,
     string? Detail,
-    long PacketsConsidered);
+    long PacketsConsidered)
+{
+    /// <summary>
+    /// The same answer as <see cref="Detail"/>, as a code the interface can translate.
+    /// </summary>
+    public string? DetailCode { get; init; }
+}

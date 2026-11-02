@@ -60,10 +60,496 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
 
+  <data name="StatusChecking" xml:space="preserve">
+    <value>A Keyhole service ellenőrzése…</value>
+  </data>
+  <data name="ThemeAuto" xml:space="preserve">
+    <value>Automatikus</value>
+  </data>
+  <data name="ThemeLight" xml:space="preserve">
+    <value>Világos</value>
+  </data>
+  <data name="ThemeDark" xml:space="preserve">
+    <value>Sötét</value>
+  </data>
+  <data name="BlockedLabel" xml:space="preserve">
+    <value>Letiltva</value>
+  </data>
+  <data name="ThemeTooltip" xml:space="preserve">
+    <value>Váltás automatikus, világos és sötét között</value>
+  </data>
+  <data name="BlockAnApp" xml:space="preserve">
+    <value>Alkalmazás letiltása…</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>Frissítés</value>
+  </data>
+  <data name="Throughput" xml:space="preserve">
+    <value>Átvitel</value>
+  </data>
+  <data name="Upload" xml:space="preserve">
+    <value>Feltöltés</value>
+  </data>
+  <data name="Download" xml:space="preserve">
+    <value>Letöltés</value>
+  </data>
+  <data name="Applications" xml:space="preserve">
+    <value>Alkalmazások</value>
+  </data>
+  <data name="SearchApps" xml:space="preserve">
+    <value>Keresés app, kiadó, host szerint…</value>
+  </data>
+  <data name="BlockSelected" xml:space="preserve">
+    <value>Kijelölt letiltása</value>
+  </data>
+  <data name="ColApplication" xml:space="preserve">
+    <value>Alkalmazás</value>
+  </data>
+  <data name="ColPublisher" xml:space="preserve">
+    <value>Kiadó</value>
+  </data>
+  <data name="ColSignature" xml:space="preserve">
+    <value>Aláírás</value>
+  </data>
+  <data name="ColConnections" xml:space="preserve">
+    <value>Kapcs.</value>
+  </data>
+  <data name="ColRate" xml:space="preserve">
+    <value>Sebesség</value>
+  </data>
+  <data name="ColTotal" xml:space="preserve">
+    <value>Összesen</value>
+  </data>
+  <data name="ColRecentHosts" xml:space="preserve">
+    <value>Legutóbbi hostok</value>
+  </data>
+  <data name="TabConnections" xml:space="preserve">
+    <value>Kapcsolatok</value>
+  </data>
+  <data name="SelectAnApplication" xml:space="preserve">
+    <value>Válassz egy alkalmazást fent, hogy lásd a kapcsolatait.</value>
+  </data>
+  <data name="ColProtocol" xml:space="preserve">
+    <value>Prot.</value>
+  </data>
+  <data name="ColPid" xml:space="preserve">
+    <value>PID</value>
+  </data>
+  <data name="ColLocal" xml:space="preserve">
+    <value>Helyi</value>
+  </data>
+  <data name="ColRemote" xml:space="preserve">
+    <value>Távoli</value>
+  </data>
+  <data name="ColPort" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="ColCountry" xml:space="preserve">
+    <value>Ország</value>
+  </data>
+  <data name="ColOperator" xml:space="preserve">
+    <value>Üzemeltető</value>
+  </data>
+  <data name="ChartCollecting" xml:space="preserve">
+    <value>Adatgyűjtés…</value>
+  </data>
+  <data name="PickerTitle" xml:space="preserve">
+    <value>Válasszon alkalmazást</value>
+  </data>
+  <data name="PickerPrograms" xml:space="preserve">
+    <value>Programok</value>
+  </data>
+  <data name="RuleExecutableChanged" xml:space="preserve">
+    <value>⚠ A program megváltozott a szabály létrehozása óta.</value>
+  </data>
+  <data name="ColState" xml:space="preserve">
+    <value>Állapot</value>
+  </data>
+  <data name="ColTraffic" xml:space="preserve">
+    <value>Forgalom</value>
+  </data>
+  <data name="TabHosts" xml:space="preserve">
+    <value>Hostok</value>
+  </data>
+  <data name="HostsIntro" xml:space="preserve">
+    <value>Célpontok forgalom szerint rangsorolva, minden alkalmazáson át. A fenti lista azt mondja meg, egy program mit csinál; ez ugyanazt a másik végéről — egy host, amivel több, egymással össze nem függő program is beszél, megér egy pillantást. A loopback kimarad.</value>
+  </data>
+  <data name="SearchHosts" xml:space="preserve">
+    <value>Keresés host, app, cím, port szerint…</value>
+  </data>
+  <data name="NoHosts" xml:space="preserve">
+    <value>Még nincs kimenő célpont.</value>
+  </data>
+  <data name="ColHost" xml:space="preserve">
+    <value>Host</value>
+  </data>
+  <data name="ColPorts" xml:space="preserve">
+    <value>Portok</value>
+  </data>
+  <data name="ColLastSeen" xml:space="preserve">
+    <value>Utoljára</value>
+  </data>
+  <data name="TabBlockedApps" xml:space="preserve">
+    <value>Letiltott appok</value>
+  </data>
+  <data name="NothingBlocked" xml:space="preserve">
+    <value>Semmi nincs letiltva. Használd az „Alkalmazás letiltása…” gombot, vagy válassz egy alkalmazást fent.</value>
+  </data>
+  <data name="ColPath" xml:space="preserve">
+    <value>Útvonal</value>
+  </data>
+  <data name="ColDirection" xml:space="preserve">
+    <value>Irány</value>
+  </data>
+  <data name="ColCreated" xml:space="preserve">
+    <value>Létrehozva</value>
+  </data>
+  <data name="Unblock" xml:space="preserve">
+    <value>Feloldás</value>
+  </data>
+  <data name="TabCapture" xml:space="preserve">
+    <value>Rögzítés</value>
+  </data>
+  <data name="CaptureIntro" xml:space="preserve">
+    <value>A Keyhole úgy indítja el az alkalmazást, hogy az SSLKEYLOGFILE kizárólag annak a folyamatnak a környezetében létezik, és közben rögzíti a csomagjait. A felvétel magában hordozza a TLS-kulcsokat, így a Wireshark beállítás nélkül, visszafejtve nyitja meg. A Windows saját TLS-ét használó programok nem írnak kulcsot, így az ő forgalmuk titkosított marad.</value>
+  </data>
+  <data name="GetNpcap" xml:space="preserve">
+    <value>Npcap letöltése…</value>
+  </data>
+  <data name="GetNpcapTooltip" xml:space="preserve">
+    <value>Letölti a telepítőt az npcap.com-ról, és futtatás előtt ellenőrzi az aláírását. A Keyhole nem terjeszti újra az Npcapet.</value>
+  </data>
+  <data name="LaunchWithKeyLogging" xml:space="preserve">
+    <value>App indítása kulcsnaplózással…</value>
+  </data>
+  <data name="NoCaptures" xml:space="preserve">
+    <value>Még nincs felvétel.</value>
+  </data>
+  <data name="ColStatus" xml:space="preserve">
+    <value>Állapot</value>
+  </data>
+  <data name="ColStarted" xml:space="preserve">
+    <value>Indítva</value>
+  </data>
+  <data name="ColTlsKeys" xml:space="preserve">
+    <value>TLS-kulcsok</value>
+  </data>
+  <data name="ColPackets" xml:space="preserve">
+    <value>Csomagok</value>
+  </data>
+  <data name="Stop" xml:space="preserve">
+    <value>Leállítás</value>
+  </data>
+  <data name="Requests" xml:space="preserve">
+    <value>Kérések</value>
+  </data>
+  <data name="RequestsTooltip" xml:space="preserve">
+    <value>Visszafejti a felvételt a session saját TLS-kulcsaival, és kilistázza, mit kért az alkalmazás.</value>
+  </data>
+  <data name="Wireshark" xml:space="preserve">
+    <value>Wireshark</value>
+  </data>
+  <data name="WiresharkTooltip" xml:space="preserve">
+    <value>Megnyitja a felvételt a Wiresharkban. A TLS-kulcsok a fájlban vannak, így nem kell keylog-útvonalat beállítani.</value>
+  </data>
+  <data name="Folder" xml:space="preserve">
+    <value>Mappa</value>
+  </data>
+  <data name="ColTime" xml:space="preserve">
+    <value>Idő</value>
+  </data>
+  <data name="ColMethod" xml:space="preserve">
+    <value>Metódus</value>
+  </data>
+  <data name="ColUrl" xml:space="preserve">
+    <value>URL</value>
+  </data>
+  <data name="ColType" xml:space="preserve">
+    <value>Típus</value>
+  </data>
+  <data name="ColSize" xml:space="preserve">
+    <value>Méret</value>
+  </data>
+  <data name="ColTook" xml:space="preserve">
+    <value>Idő</value>
+  </data>
+  <data name="TabSettings" xml:space="preserve">
+    <value>Beállítások</value>
+  </data>
   <data name="SettingsLanguage" xml:space="preserve">
     <value>Nyelv</value>
   </data>
   <data name="SettingsLanguageAuto" xml:space="preserve">
     <value>Rendszer nyelve</value>
+  </data>
+  <data name="SettingsCloseToTray" xml:space="preserve">
+    <value>Bezáráskor a tálcára, ne lépjen ki</value>
+  </data>
+  <data name="SettingsStartWithWindows" xml:space="preserve">
+    <value>A Keyhole induljon bejelentkezéskor</value>
+  </data>
+  <data name="SettingsResolveHostnames" xml:space="preserve">
+    <value>Távoli címek feloldása hostnévre</value>
+  </data>
+  <data name="SettingsKeepHistoryFor" xml:space="preserve">
+    <value>Forgalomtörténet megőrzése</value>
+  </data>
+  <data name="SettingsDays" xml:space="preserve">
+    <value>napig</value>
+  </data>
+  <data name="SettingsStopRecordingAfter" xml:space="preserve">
+    <value>Csomagrögzítés leállítása</value>
+  </data>
+  <data name="SettingsMbPerSession" xml:space="preserve">
+    <value>MB után sessiononként</value>
+  </data>
+  <data name="SettingsPcapLimitNote" xml:space="preserve">
+    <value>Egy böngésző-session percek alatt több száz megabájtot termel. A plafonnál a csomagrögzítés leáll és kiírja; a session és a kulcsgyűjtés megy tovább. A service újraindítása után indított felvételekre érvényes.</value>
+  </data>
+  <data name="SettingsDataNote" xml:space="preserve">
+    <value>A forgalomtörténet, a szabályok és a felvételek a %ProgramData%\Keyhole alatt vannak. Egy felvétel-mappa a rögzített csomagokat és a visszafejtésükhöz szükséges TLS-kulcsokat is tartalmazza, egy helyen — kezeld olyan érzékenyen, mint magát a forgalmat.</value>
+  </data>
+  <data name="StateUnknown" xml:space="preserve">
+    <value>Ismeretlen</value>
+  </data>
+  <data name="StateConnecting" xml:space="preserve">
+    <value>Kapcsolódás</value>
+  </data>
+  <data name="StateConnected" xml:space="preserve">
+    <value>Kapcsolódva</value>
+  </data>
+  <data name="StateUnavailable" xml:space="preserve">
+    <value>Nem elérhető</value>
+  </data>
+  <data name="StateError" xml:space="preserve">
+    <value>Hiba</value>
+  </data>
+  <data name="CaptureStatusRunning" xml:space="preserve">
+    <value>Rögzít</value>
+  </data>
+  <data name="CaptureStatusFinished" xml:space="preserve">
+    <value>Befejezve</value>
+  </data>
+  <data name="StatusApps" xml:space="preserve">
+    <value>{0} alkalmazás, {1} aktív kapcsolat.</value>
+  </data>
+  <data name="StatusServiceUnreachable" xml:space="preserve">
+    <value>A service nem érhető el: {0}</value>
+  </data>
+  <data name="StatusServiceError" xml:space="preserve">
+    <value>Service-hiba ({0}): {1}</value>
+  </data>
+  <data name="StatusServiceSilent" xml:space="preserve">
+    <value>A service 5 másodpercen belül nem válaszolt.</value>
+  </data>
+  <data name="CapabilityNotElevated" xml:space="preserve">
+    <value>A service nem fut emelt jogon, ezért {0} nem érhető el. A kapcsolat-monitorozás továbbra is működik.</value>
+  </data>
+  <data name="CapabilityByteCounting" xml:space="preserve">
+    <value>a forgalomszámlálás</value>
+  </data>
+  <data name="CapabilityBlocking" xml:space="preserve">
+    <value>a blokkolás</value>
+  </data>
+  <data name="CapabilityAnd" xml:space="preserve">
+    <value> és </value>
+  </data>
+  <data name="ReasonNotElevated" xml:space="preserve">
+    <value>A service nem fut rendszergazdai jogosultsággal.</value>
+  </data>
+  <data name="ReasonEtwUnavailable" xml:space="preserve">
+    <value>A nyomkövetési session nem indult el, ezért a forgalom-számok nullák.</value>
+  </data>
+  <data name="ReasonFirewallUnreachable" xml:space="preserve">
+    <value>A Windows tűzfal nem érhető el.</value>
+  </data>
+  <data name="ReasonBlockNoExecutable" xml:space="preserve">
+    <value>Azon az útvonalon nincs program, így nincs mit blokkolni.</value>
+  </data>
+  <data name="ReasonBlockNoRule" xml:space="preserve">
+    <value>Ez a szabály már nem létezik.</value>
+  </data>
+  <data name="ReasonBlockRuleFailed" xml:space="preserve">
+    <value>A Windows tűzfal elutasította a módosítást. A részletek a szolgáltatás naplójában vannak.</value>
+  </data>
+  <data name="ReasonGeoIpNone" xml:space="preserve">
+    <value>Nincs GeoIP-adatbázis. Tedd a GeoLite2-Country.mmdb és a GeoLite2-ASN.mmdb fájlt ide: {0} — így látszik az ország és a hálózat üzemeltetője. A Keyhole nem tölti le őket: a MaxMindé, és ingyenes fiók kell hozzá.</value>
+  </data>
+  <data name="ReasonGeoIpNoCountry" xml:space="preserve">
+    <value>Nincs ország-adatbázis itt: {0} — tedd be a GeoLite2-Country.mmdb fájlt.</value>
+  </data>
+  <data name="ReasonGeoIpNoAsn" xml:space="preserve">
+    <value>Nincs ASN-adatbázis itt: {0} — tedd be a GeoLite2-ASN.mmdb fájlt.</value>
+  </data>
+  <data name="ReasonRecordingNoNpcap" xml:space="preserve">
+    <value>nincs csomag: az Npcap nem érhető el</value>
+  </data>
+  <data name="ReasonRecordingNoAdapter" xml:space="preserve">
+    <value>nincs csomag: egyetlen rögzítő adaptert sem sikerült megnyitni</value>
+  </data>
+  <data name="ReasonRecordingFileError" xml:space="preserve">
+    <value>nincs csomag: a felvételfájl nem jött létre</value>
+  </data>
+  <data name="ReasonRecordingSizeLimit" xml:space="preserve">
+    <value>a rögzítés leállt a méretkorlátnál</value>
+  </data>
+  <data name="ReasonRecordingNoSecrets" xml:space="preserve">
+    <value>nem íródott TLS-kulcs</value>
+  </data>
+  <data name="ReasonRecordingSecretsNotEmbedded" xml:space="preserve">
+    <value>a TLS-kulcsok a felvétel melletti keylogban vannak, nem a fájlban</value>
+  </data>
+  <data name="ReasonDecodeNoCapture" xml:space="preserve">
+    <value>Ez a session nem rögzített csomagot, így nincs mit visszafejteni. A csomagrögzítéshez Npcap kell.</value>
+  </data>
+  <data name="ReasonDecodeFileMissing" xml:space="preserve">
+    <value>A felvételfájl eltűnt.</value>
+  </data>
+  <data name="ReasonDecodeUnreadable" xml:space="preserve">
+    <value>A felvételfájl nem olvasható.</value>
+  </data>
+  <data name="ReasonDecodeTooMany" xml:space="preserve">
+    <value>A felvétel több kapcsolatot tartalmaz, mint ami egyszerre visszafejthető; csak az elsők lettek beolvasva.</value>
+  </data>
+  <data name="ReasonDecodeFailed" xml:space="preserve">
+    <value>A felvételt nem sikerült visszafejteni.</value>
+  </data>
+  <data name="ReasonExchangeNoResponse" xml:space="preserve">
+    <value>nem került rögzítésre válasz</value>
+  </data>
+  <data name="ReasonExchangeResponseTruncated" xml:space="preserve">
+    <value>a válasz még érkezett, amikor a felvétel véget ért</value>
+  </data>
+  <data name="ReasonExchangeBodyTruncated" xml:space="preserve">
+    <value>a törzs megszakadt, amikor a felvétel véget ért</value>
+  </data>
+  <data name="ReasonExchangeHeadersBroken" xml:space="preserve">
+    <value>a fejléceket nem sikerült kitömöríteni</value>
+  </data>
+  <data name="ReasonCaptureNoExecutable" xml:space="preserve">
+    <value>Azon az útvonalon nincs program.</value>
+  </data>
+  <data name="ReasonCaptureLaunchFailed" xml:space="preserve">
+    <value>Az alkalmazást nem sikerült elindítani.</value>
+  </data>
+  <data name="NpcapMissing" xml:space="preserve">
+    <value>Az Npcap nincs telepítve, így a Keyhole nem tud csomagot rögzíteni. A TLS-kulcsnaplózás enélkül is működik.</value>
+  </data>
+  <data name="NpcapStopped" xml:space="preserve">
+    <value>Az Npcap telepítve van, de a drivere nem fut. Indítsd el az „npcap” szolgáltatást a csomagrögzítéshez.</value>
+  </data>
+  <data name="NpcapUnusable" xml:space="preserve">
+    <value>Az Npcap telepítve van, de a könyvtára nem található. Az Npcap újratelepítése helyrehozza.</value>
+  </data>
+  <data name="KeylogUnlikely" xml:space="preserve">
+    <value>a Windows TLS-ét használja, ami figyelmen kívül hagyja az SSLKEYLOGFILE-t</value>
+  </data>
+  <data name="KeylogNoneYet" xml:space="preserve">
+    <value>még nincs kulcs — lehet, hogy a Windows TLS-ét használja</value>
+  </data>
+  <data name="KeylogNoneWritten" xml:space="preserve">
+    <value>nem íródott kulcs</value>
+  </data>
+  <data name="DecodeRequests" xml:space="preserve">
+    <value>{0} kérés</value>
+  </data>
+  <data name="DecodeOneRequest" xml:space="preserve">
+    <value>1 kérés</value>
+  </data>
+  <data name="DecodeDecrypted" xml:space="preserve">
+    <value>{1} TLS-kapcsolatból {0} visszafejtve</value>
+  </data>
+  <data name="DecodeNoneDecrypted" xml:space="preserve">
+    <value>{0} kapcsolatból egyet sem sikerült visszafejteni</value>
+  </data>
+  <data name="DecodeNoKeys" xml:space="preserve">
+    <value>{0} esetében nincs kulcs a felvételben (ezek a Windows saját TLS-ét használják, ami figyelmen kívül hagyja az SSLKEYLOGFILE-t)</value>
+  </data>
+  <data name="DecodeNoHandshake" xml:space="preserve">
+    <value>{0} esetében nincs handshake a felvételben, így semmi nem azonosítja őket (vagy megelőzik a rögzítést, vagy az első csomagjaik kimaradtak)</value>
+  </data>
+  <data name="DecodeFailedCount" xml:space="preserve">
+    <value>{0} esetében volt kulcs, de a Keyhole nem tudta használni</value>
+  </data>
+  <data name="DecodeQuic" xml:space="preserve">
+    <value>{0} KB QUIC/HTTP3 rögzítve lett, de nem visszafejthető</value>
+  </data>
+  <data name="DecodeTruncated" xml:space="preserve">
+    <value>további {0} kérés nem látszik</value>
+  </data>
+  <data name="DecodeInProgress" xml:space="preserve">
+    <value>{0} visszafejtése…</value>
+  </data>
+  <data name="DecodeNoAnswer" xml:space="preserve">
+    <value>A service nem fejezte be a felvétel visszafejtését.</value>
+  </data>
+  <data name="ActionNoPath" xml:space="preserve">
+    <value>Ennél a bejegyzésnél nincs olvasható programútvonal, így nem tiltható le.</value>
+  </data>
+  <data name="ActionBlocked" xml:space="preserve">
+    <value>{0} letiltva.</value>
+  </data>
+  <data name="ActionUnblocked" xml:space="preserve">
+    <value>{0} feloldva.</value>
+  </data>
+  <data name="ActionBlockFailed" xml:space="preserve">
+    <value>A service nem válaszolt; semmi nem lett letiltva.</value>
+  </data>
+  <data name="ActionUnblockFailed" xml:space="preserve">
+    <value>A service nem válaszolt; a szabály nem lett törölve.</value>
+  </data>
+  <data name="ActionCaptureStartFailed" xml:space="preserve">
+    <value>A service nem válaszolt; semmi nem indult el.</value>
+  </data>
+  <data name="ActionCaptureStopFailed" xml:space="preserve">
+    <value>A service nem válaszolt; a felvétel nem állt le.</value>
+  </data>
+  <data name="ActionCaptureStarted" xml:space="preserve">
+    <value>{0} rögzítése folyik. A TLS-kulcsok ide kerülnek: {1}.</value>
+  </data>
+  <data name="ActionCaptureStartedSchannel" xml:space="preserve">
+    <value>{0} elindult, de a Windows TLS-ét használja, ami figyelmen kívül hagyja az SSLKEYLOGFILE-t. Nem fog kulcsot írni.</value>
+  </data>
+  <data name="ActionCaptureStartedUnknown" xml:space="preserve">
+    <value>{0} elindult. Ha a keylog nulla bájton marad, ez az alkalmazás a Windows TLS-ét használja, és így nem rögzíthető.</value>
+  </data>
+  <data name="ActionCaptureStopped" xml:space="preserve">
+    <value>{0} rögzítése leállt. Az alkalmazás tovább fut.</value>
+  </data>
+  <data name="ActionNoPcap" xml:space="preserve">
+    <value>Ez a session nem rögzített csomagot, így nincs mit megnyitni.</value>
+  </data>
+  <data name="ActionOpenedInWireshark" xml:space="preserve">
+    <value>Megnyitva a Wiresharkban. A TLS-kulcsok a felvételben vannak, így magától visszafejtve nyílik.</value>
+  </data>
+  <data name="ActionOpenedInWiresharkNoKeys" xml:space="preserve">
+    <value>Megnyitva a Wiresharkban. Ez a session nem írt TLS-kulcsot, így a forgalom titkosított marad.</value>
+  </data>
+  <data name="ActionOpenedWithDefault" xml:space="preserve">
+    <value>{0} megnyitva a hozzá rendelt alkalmazással.</value>
+  </data>
+  <data name="ActionOpenFailed" xml:space="preserve">
+    <value>A felvétel nem nyitható meg: {0}</value>
+  </data>
+  <data name="ActionFolderOpenFailed" xml:space="preserve">
+    <value>{0} nem nyitható meg.</value>
+  </data>
+  <data name="ActionSettingsSaveFailed" xml:space="preserve">
+    <value>A beállítások nem menthetők: {0}</value>
+  </data>
+  <data name="ActionStartupFailed" xml:space="preserve">
+    <value>A bejelentkezéskori indítás bejegyzése nem frissíthető.</value>
+  </data>
+  <data name="NpcapDownloading" xml:space="preserve">
+    <value>Az Npcap {0} letöltése az npcap.com-ról…</value>
+  </data>
+  <data name="NpcapInstallerRunning" xml:space="preserve">
+    <value>Az Npcap telepítője fut. Amint végez, a felvételek rögzíteni fogják a csomagokat — a Keyhole-t nem kell újraindítani.</value>
+  </data>
+  <data name="NpcapInstallerNotStarted" xml:space="preserve">
+    <value>Az Npcap telepítője letöltődött és ellenőrizve lett, de nem indult el. Futtasd magad innen: {0} — vagy telepítsd innen: {1}.</value>
+  </data>
+  <data name="NpcapFetchFailed" xml:space="preserve">
+    <value>Az Npcap nem tölthető le ({0}). Telepítsd innen: {1}.</value>
   </data>
 </root>

@@ -52,8 +52,26 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private ConnectionState _state = ConnectionState.Unknown;
 
+    /// <summary>
+    /// The connection state as a word, translated.
+    ///
+    /// Separate from <see cref="State"/> because the enum still drives the status dot's
+    /// colour, and an enum that has been turned into a sentence can no longer be switched
+    /// on. Same split as <see cref="Theme"/> and <see cref="ThemeLabel"/>.
+    /// </summary>
+    public string StateLabel => State switch
+    {
+        ConnectionState.Connecting => Strings["StateConnecting"],
+        ConnectionState.Connected => Strings["StateConnected"],
+        ConnectionState.Unavailable => Strings["StateUnavailable"],
+        ConnectionState.Error => Strings["StateError"],
+        _ => Strings["StateUnknown"],
+    };
+
+    partial void OnStateChanged(ConnectionState value) => OnPropertyChanged(nameof(StateLabel));
+
     [ObservableProperty]
-    private string _statusMessage = "Checking the Keyhole service…";
+    private string _statusMessage = Loc.Current["StatusChecking"];
 
     [ObservableProperty]
     private string? _serviceVersion;
@@ -127,38 +145,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// for the same reason — no elevation — so two separate strips would say the same
     /// thing twice and cost a third of the list's vertical space.
     /// </summary>
-    public string? CapabilityWarning
-    {
-        get
-        {
-            var missing = new List<string>(2);
-            if (ByteCountingWarning is not null)
-            {
-                missing.Add("byte counting");
-            }
-
-            if (BlockingWarning is not null)
-            {
-                missing.Add("blocking");
-            }
-
-            if (missing.Count == 0)
-            {
-                return null;
-            }
-
-            // Both reasons currently say "needs administrator rights". If they ever
-            // diverge, fall back to showing them in full rather than inventing a summary.
-            var sameCause = ByteCountingWarning is null || BlockingWarning is null ||
-                            (ByteCountingWarning.Contains("administrator", StringComparison.OrdinalIgnoreCase) &&
-                             BlockingWarning.Contains("administrator", StringComparison.OrdinalIgnoreCase));
-
-            return sameCause
-                ? $"The service is not elevated, so {string.Join(" and ", missing)} are unavailable. " +
-                  "Connection monitoring still works."
-                : $"{ByteCountingWarning} {BlockingWarning}";
-        }
-    }
+    public string? CapabilityWarning =>
+        Reasons.DescribeCapabilities(ByteCountingWarning, BlockingWarning);
 
     partial void OnBlockingWarningChanged(string? value)
     {
@@ -339,11 +327,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             ServiceVersion = status.Version;
             ServiceIsElevated = status.IsElevated;
             ActiveConnections = status.ActiveConnections ?? 0;
-            ByteCountingWarning = status.ByteCountingUnavailableReason;
-            BlockingWarning = status.BlockingUnavailableReason;
-            PacketCaptureWarning = status.PacketCaptureUnavailableReason;
+            // Codes, rendered here rather than sentences composed by the service: the
+            // interface exists in two languages, and the explanatory text is exactly
+            // where a user needs their own.
+            ByteCountingWarning = status.ByteCountingUnavailable;
+            BlockingWarning = status.BlockingUnavailable;
             NpcapState = status.NpcapState;
-            GeoIpWarning = status.GeoIpUnavailableReason;
+            PacketCaptureWarning = Reasons.DescribeNpcap(status.NpcapState);
+            GeoIpWarning = Reasons.Describe(status.GeoIpUnavailable, status.GeoIpDirectory);
 
             var apps = await _client.ListAppsAsync(cts.Token);
             MergeApps(apps);
@@ -354,7 +345,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             await LoadCapturesAsync(cts.Token);
 
             State = ConnectionState.Connected;
-            StatusMessage = $"{Apps.Count} apps, {ActiveConnections} active connections.";
+            StatusMessage = string.Format(Strings["StatusApps"], Apps.Count, ActiveConnections);
 
             if (SelectedApp is not null)
             {
@@ -364,19 +355,19 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         catch (ServiceUnavailableException ex)
         {
             State = ConnectionState.Unavailable;
-            StatusMessage = $"Service unreachable: {ex.Message}";
+            StatusMessage = string.Format(Strings["StatusServiceUnreachable"], ex.Message);
             Apps.Clear();
             Flows.Clear();
         }
         catch (ServiceCallException ex)
         {
             State = ConnectionState.Error;
-            StatusMessage = $"Service error ({ex.Code}): {ex.Message}";
+            StatusMessage = string.Format(Strings["StatusServiceError"], ex.Code, ex.Message);
         }
         catch (OperationCanceledException)
         {
             State = ConnectionState.Unavailable;
-            StatusMessage = "Service did not answer within 5 seconds.";
+            StatusMessage = Strings["StatusServiceSilent"];
         }
         finally
         {
@@ -455,18 +446,35 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        (app.RequestedThemeVariant, ThemeLabel) = app.RequestedThemeVariant switch
+        (app.RequestedThemeVariant, Theme) = app.RequestedThemeVariant switch
         {
-            var v when v == ThemeVariant.Dark => (ThemeVariant.Light, "Light"),
-            var v when v == ThemeVariant.Light => (ThemeVariant.Default, "Auto"),
-            _ => (ThemeVariant.Dark, "Dark"),
+            var v when v == ThemeVariant.Dark => (ThemeVariant.Light, "light"),
+            var v when v == ThemeVariant.Light => (ThemeVariant.Default, "auto"),
+            _ => (ThemeVariant.Dark, "dark"),
         };
 
         PersistSettings();
     }
 
+    /// <summary>
+    /// "auto", "light" or "dark" — the value that goes in settings.json.
+    ///
+    /// Kept apart from the button's caption, which is translated. The two used to be one
+    /// property, and localising it would have written "Sötét" into the settings file and
+    /// lost the user's theme on the next start.
+    /// </summary>
     [ObservableProperty]
-    private string _themeLabel = "Auto";
+    private string _theme = "auto";
+
+    /// <summary>The button's caption, in the current language.</summary>
+    public string ThemeLabel => Theme switch
+    {
+        "light" => Strings["ThemeLight"],
+        "dark" => Strings["ThemeDark"],
+        _ => Strings["ThemeAuto"],
+    };
+
+    partial void OnThemeChanged(string value) => OnPropertyChanged(nameof(ThemeLabel));
 
     private KeyholeSettings _settings = new();
 
@@ -477,12 +485,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         set
         {
             _settings = value;
-            ThemeLabel = value.Theme switch
-            {
-                "light" => "Light",
-                "dark" => "Dark",
-                _ => "Auto",
-            };
+            Theme = value.Theme;
 
             // Set before anything else reads a string: the rest of this method and the
             // first refresh both compose text, and they should do it in the right
@@ -519,6 +522,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         Loc.Current.SetCulture(AppLanguage.Resolve(value));
 
         OnPropertyChanged(nameof(LanguageLabel));
+
+        // The labels that are computed from a stored value rather than bound to a resource
+        // directly. Nothing else recomputes them: the stored value did not change, only
+        // the language it is rendered in.
+        OnPropertyChanged(nameof(ThemeLabel));
+        OnPropertyChanged(nameof(StateLabel));
+        OnPropertyChanged(nameof(CapabilityWarning));
 
         // Every row's text was built in the old language, so the lists have to be rebuilt
         // rather than merged: a row object caches its formatted strings at construction.
@@ -560,7 +570,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         if (!StartupRegistration.SetEnabled(value))
         {
-            SettingsMessage = "Could not update the sign-in startup entry.";
+            SettingsMessage = Strings["ActionStartupFailed"];
             return;
         }
 
@@ -576,7 +586,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             RetentionDays = RetentionDays,
             MaxPcapMegabytes = MaxPcapMegabytes,
             StartWithWindows = StartWithWindows,
-            Theme = ThemeLabel.ToLowerInvariant(),
+            Theme = Theme,
             Language = Language,
         };
 
@@ -588,7 +598,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Settings are a convenience; failing to save one must not break the session.
-            SettingsMessage = $"Could not save settings: {ex.Message}";
+            SettingsMessage = string.Format(Strings["ActionSettingsSaveFailed"], ex.Message);
         }
     }
 
@@ -597,7 +607,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         if (SelectedApp?.ExecutablePath is not { } path)
         {
-            LastActionMessage = "This entry has no readable executable path, so it cannot be blocked.";
+            LastActionMessage = Strings["ActionNoPath"];
             return;
         }
 
@@ -633,17 +643,19 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var rule = await _client.BlockAppAsync(path, "outbound", null, cts.Token);
 
-            LastActionMessage = $"Blocked {rule.DisplayName}.";
+            LastActionMessage = string.Format(Strings["ActionBlocked"], rule.DisplayName);
             await LoadRulesAsync(cts.Token);
         }
         catch (ServiceCallException ex)
         {
-            // Carries the real reason — not elevated, file missing — so show it verbatim.
-            LastActionMessage = ex.Message;
+            // Carries the real reason as a code — not elevated, file missing — so it is
+            // phrased here. An unrecognised code shows as itself, which is something the
+            // user can search for rather than nothing.
+            LastActionMessage = Reasons.Describe(ex.Message);
         }
         catch (Exception ex) when (ex is ServiceUnavailableException or OperationCanceledException)
         {
-            LastActionMessage = "The service did not respond; the block was not applied.";
+            LastActionMessage = Strings["ActionBlockFailed"];
         }
     }
 
@@ -660,16 +672,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await _client.UnblockAppAsync(rule.Id, cts.Token);
 
-            LastActionMessage = $"Unblocked {rule.DisplayName}.";
+            LastActionMessage = string.Format(Strings["ActionUnblocked"], rule.DisplayName);
             await LoadRulesAsync(cts.Token);
         }
         catch (ServiceCallException ex)
         {
-            LastActionMessage = ex.Message;
+            LastActionMessage = Reasons.Describe(ex.Message);
         }
         catch (Exception ex) when (ex is ServiceUnavailableException or OperationCanceledException)
         {
-            LastActionMessage = "The service did not respond; the rule was not removed.";
+            LastActionMessage = Strings["ActionUnblockFailed"];
         }
     }
 
@@ -700,26 +712,27 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
             LastActionMessage = session.KeylogSupport switch
             {
-                "likely" => $"Capturing {session.DisplayName}. TLS keys go to {session.KeylogFile}.",
+                "likely" => string.Format(
+                    Strings["ActionCaptureStarted"], session.DisplayName, session.KeylogFile),
 
                 // Said up front rather than leaving the user watching a keylog that will
                 // never grow. Windows' own curl.exe is the classic case.
-                "unlikely" => $"Started {session.DisplayName}, but it uses Windows' TLS stack, " +
-                              "which ignores SSLKEYLOGFILE. No keys will be written.",
+                "unlikely" => string.Format(
+                    Strings["ActionCaptureStartedSchannel"], session.DisplayName),
 
-                _ => $"Started {session.DisplayName}. If the keylog stays at zero bytes, " +
-                     "this application uses Windows' TLS stack and cannot be captured this way.",
+                _ => string.Format(
+                    Strings["ActionCaptureStartedUnknown"], session.DisplayName),
             };
 
             await LoadCapturesAsync(cts.Token);
         }
         catch (ServiceCallException ex)
         {
-            LastActionMessage = ex.Message;
+            LastActionMessage = Reasons.Describe(ex.Message);
         }
         catch (Exception ex) when (ex is ServiceUnavailableException or OperationCanceledException)
         {
-            LastActionMessage = "The service did not respond; nothing was started.";
+            LastActionMessage = Strings["ActionCaptureStartFailed"];
         }
     }
 
@@ -736,13 +749,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await _client.StopCaptureAsync(capture.Id, cts.Token);
 
-            LastActionMessage = $"Stopped capturing {capture.DisplayName}. The application is still running.";
+            LastActionMessage = string.Format(Strings["ActionCaptureStopped"], capture.DisplayName);
             await LoadCapturesAsync(cts.Token);
         }
         catch (Exception ex) when (ex is ServiceUnavailableException or ServiceCallException
                                       or OperationCanceledException)
         {
-            LastActionMessage = "The service did not respond; the capture was not stopped.";
+            LastActionMessage = Strings["ActionCaptureStopFailed"];
         }
     }
 
@@ -781,7 +794,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         IsDecoding = true;
         DecodedCapture = capture;
         Exchanges.Clear();
-        DecodeSummary = $"Decoding {capture.DisplayName}…";
+        DecodeSummary = string.Format(Strings["DecodeInProgress"], capture.DisplayName);
 
         try
         {
@@ -796,20 +809,84 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 Exchanges.Add(new ExchangeRow(exchange));
             }
 
-            DecodeSummary = result.Summary;
+            DecodeSummary = SummariseDecode(result);
         }
         catch (ServiceCallException ex)
         {
-            DecodeSummary = ex.Message;
+            DecodeSummary = Reasons.Describe(ex.Message);
         }
         catch (Exception ex) when (ex is ServiceUnavailableException or OperationCanceledException)
         {
-            DecodeSummary = "The service did not finish decoding this capture.";
+            DecodeSummary = Strings["DecodeNoAnswer"];
         }
         finally
         {
             IsDecoding = false;
         }
+    }
+
+    /// <summary>
+    /// Builds the line above the request list, in the current language.
+    ///
+    /// Composed here rather than by the service, from the counts it sends. That is the
+    /// whole reason every decode outcome has to land in one of those counts: the sentence
+    /// is assembled from numbers, so a bucket nobody counts is a clause nobody can write.
+    ///
+    /// The failures matter as much as the results. A capture of a Schannel application
+    /// yields nothing and that is expected; one full of QUIC yields nothing for an
+    /// entirely different reason. "0 requests" for both would make the feature look broken
+    /// in one case and working in the other, when the truth is the reverse.
+    /// </summary>
+    private string SummariseDecode(DecodeCaptureResponse result)
+    {
+        if (result.Failure is { } failure)
+        {
+            return Reasons.Describe(failure);
+        }
+
+        var parts = new List<string>
+        {
+            result.Exchanges.Count == 1
+                ? Strings["DecodeOneRequest"]
+                : string.Format(Strings["DecodeRequests"], result.Exchanges.Count),
+        };
+
+        if (result.Decrypted > 0)
+        {
+            parts.Add(string.Format(
+                Strings["DecodeDecrypted"], result.Decrypted, result.Conversations));
+        }
+        else if (result.Conversations > 0)
+        {
+            parts.Add(string.Format(Strings["DecodeNoneDecrypted"], result.Conversations));
+        }
+
+        if (result.EncryptedWithoutKeys > 0)
+        {
+            parts.Add(string.Format(Strings["DecodeNoKeys"], result.EncryptedWithoutKeys));
+        }
+
+        if (result.HandshakeMissing > 0)
+        {
+            parts.Add(string.Format(Strings["DecodeNoHandshake"], result.HandshakeMissing));
+        }
+
+        if (result.DecryptionFailed > 0)
+        {
+            parts.Add(string.Format(Strings["DecodeFailedCount"], result.DecryptionFailed));
+        }
+
+        if (result.QuicBytes > 0)
+        {
+            parts.Add(string.Format(Strings["DecodeQuic"], result.QuicBytes / 1024));
+        }
+
+        if (result.Truncated > 0)
+        {
+            parts.Add(string.Format(Strings["DecodeTruncated"], result.Truncated));
+        }
+
+        return string.Join("; ", parts) + ".";
     }
 
     /// <summary>
@@ -825,7 +902,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         if (capture?.PcapFile is not { } pcap || !File.Exists(pcap))
         {
-            LastActionMessage = "This session recorded no packets, so there is nothing to open.";
+            LastActionMessage = Strings["ActionNoPcap"];
             return;
         }
 
@@ -839,7 +916,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
                 // the file to the shell lets whatever is registered for .pcapng take it,
                 // which is Wireshark on any machine that has it.
                 Process.Start(new ProcessStartInfo { FileName = pcap, UseShellExecute = true });
-                LastActionMessage = $"Opened {Path.GetFileName(pcap)} with its registered application.";
+                LastActionMessage = string.Format(
+                    Strings["ActionOpenedWithDefault"], Path.GetFileName(pcap));
                 return;
             }
 
@@ -851,12 +929,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
             });
 
             LastActionMessage = capture.HasKeys
-                ? "Opened in Wireshark. The TLS keys are inside the capture, so it decrypts itself."
-                : "Opened in Wireshark. This session wrote no TLS keys, so the traffic stays encrypted.";
+                ? Strings["ActionOpenedInWireshark"]
+                : Strings["ActionOpenedInWiresharkNoKeys"];
         }
         catch (Exception ex)
         {
-            LastActionMessage = $"Could not open the capture: {ex.Message}";
+            LastActionMessage = string.Format(Strings["ActionOpenFailed"], ex.Message);
         }
     }
 
@@ -888,7 +966,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         IsInstallingNpcap = true;
-        PacketCaptureWarning = $"Downloading Npcap {NpcapInstallerFetch.PinnedVersion} from npcap.com…";
+        PacketCaptureWarning = string.Format(
+            Strings["NpcapDownloading"], NpcapInstallerFetch.PinnedVersion);
 
         try
         {
@@ -902,23 +981,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
             if (!NpcapInstallerFetch.Launch(result.InstallerPath!))
             {
-                PacketCaptureWarning =
-                    "The Npcap installer was downloaded and verified but not started. " +
-                    $"Run it yourself from {result.InstallerPath}, or install from " +
-                    $"{NpcapInstallerFetch.HomepageUri}.";
+                PacketCaptureWarning = string.Format(
+                    Strings["NpcapInstallerNotStarted"],
+                    result.InstallerPath,
+                    NpcapInstallerFetch.HomepageUri);
 
                 return;
             }
 
-            PacketCaptureWarning =
-                "Npcap's installer is running. Captures will record packets once it " +
-                "finishes — no need to restart Keyhole.";
+            PacketCaptureWarning = Strings["NpcapInstallerRunning"];
         }
         catch (Exception ex)
         {
-            PacketCaptureWarning =
-                $"Could not fetch Npcap ({ex.Message}). Install it from " +
-                $"{NpcapInstallerFetch.HomepageUri}.";
+            PacketCaptureWarning = string.Format(
+                Strings["NpcapFetchFailed"], ex.Message, NpcapInstallerFetch.HomepageUri);
         }
         finally
         {
@@ -948,7 +1024,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         }
         catch (Exception)
         {
-            LastActionMessage = $"Could not open {capture.Directory}.";
+            LastActionMessage = string.Format(Strings["ActionFolderOpenFailed"], capture.Directory);
         }
     }
 
@@ -1109,7 +1185,7 @@ public sealed partial class AppRow : ObservableObject
 
         BlockedByRuleId = summary.BlockedByRuleId;
         IsBlocked = summary.BlockedByRuleId is not null;
-        BlockedLabel = IsBlocked ? "Blocked" : "";
+        BlockedLabel = IsBlocked ? Loc.Current["BlockedLabel"] : "";
 
         // Loaded once per row: the shell lookup is cached, but building an Avalonia
         // bitmap on every two-second refresh would still churn.
@@ -1140,7 +1216,7 @@ public sealed class RuleRow(RuleSummary rule)
     /// </summary>
     public string ExecutableWarning { get; } = rule.ExecutableState switch
     {
-        "changed" => "⚠ executable changed since this rule was created",
+        "changed" => Loc.Current["RuleExecutableChanged"],
         "unknown" => "",
         _ => "",
     };
@@ -1155,7 +1231,8 @@ public sealed class CaptureRow(CaptureSummary session)
     public string DisplayName { get; } = session.DisplayName;
     public string Directory { get; } = session.Directory;
     public bool IsRunning { get; } = session.IsRunning;
-    public string Status { get; } = session.IsRunning ? "Capturing" : "Finished";
+    public string Status { get; } =
+        Loc.Current[session.IsRunning ? "CaptureStatusRunning" : "CaptureStatusFinished"];
     public string Started { get; } = session.StartedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
     public string KeylogSize { get; } = Format.Bytes(session.KeylogBytes);
 
@@ -1186,11 +1263,15 @@ public sealed class CaptureRow(CaptureSummary session)
     /// </summary>
     public string Note { get; } = session switch
     {
-        { RecordingIssue: { } issue } => issue,
-        { KeylogSupport: "unlikely" } => "uses Windows TLS, which ignores SSLKEYLOGFILE",
+        // The size limit is the one issue that needs a number, so it is the one that gets
+        // the extra value. Everything else is a code on its own.
+        { RecordingIssue: ReasonCodes.RecordingSizeLimit } =>
+            Reasons.Describe(ReasonCodes.RecordingSizeLimit, session.SizeLimitMegabytes),
+        { RecordingIssue: { } issue } => Reasons.Describe(issue),
+        { KeylogSupport: "unlikely" } => Loc.Current["KeylogUnlikely"],
         { IsRunning: true, KeylogBytes: 0, KeylogSupport: "unknown" } =>
-            "no keys yet — may use Windows TLS",
-        { IsRunning: false, KeylogBytes: 0 } => "no keys were written",
+            Loc.Current["KeylogNoneYet"],
+        { IsRunning: false, KeylogBytes: 0 } => Loc.Current["KeylogNoneWritten"],
         _ => "",
     };
 }
@@ -1283,7 +1364,7 @@ public sealed class ExchangeRow(ExchangeSummary exchange)
 
     public string Time { get; } = exchange.RequestedUtc.ToLocalTime().ToString("HH:mm:ss.fff");
 
-    public string Note { get; } = exchange.Incomplete ?? "";
+    public string Note { get; } = Reasons.Describe(exchange.Incomplete);
 
     /// <summary>
     /// Headers folded into one tooltip. The grid has no room for them as columns, and a

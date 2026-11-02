@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Net;
 using Keyhole.Core.Capture.Pcapng;
 using Keyhole.Core.Capture.Recording;
+using Keyhole.Core.Ipc;
 using Keyhole.Core.Monitoring;
 
 namespace Keyhole.Tests;
@@ -309,7 +310,7 @@ public class PacketRecordingTests
         var tracker = new TargetPortTracker(new FakeSockets([]), new FakeTree([1]));
 
         var recording = PacketRecording.Start(
-            new UnavailableDevices("Npcap is not installed."),
+            new UnavailableDevices(),
             tracker,
             Path.Combine(Path.GetTempPath(), $"keyhole-never-{Guid.NewGuid():N}.pcapng"),
             rootProcessId: 1,
@@ -318,7 +319,7 @@ public class PacketRecordingTests
         // Capture sessions existed before packet recording did, and they still work
         // without it. A missing Npcap must read as a reason, not an exception.
         Assert.False(recording.IsRecording);
-        Assert.Equal("Npcap is not installed.", recording.UnavailableReason);
+        Assert.Equal(ReasonCodes.RecordingNoNpcap, recording.UnavailableCode);
         Assert.Null(recording.PcapngPath);
 
         var summary = recording.Stop(null);
@@ -536,9 +537,17 @@ internal sealed class SingleDeviceFactory(IPacketDevice device) : IPacketDeviceF
     public PacketDeviceSet OpenAll(int snapLength) => new([device], null);
 }
 
-internal sealed class UnavailableDevices(string reason) : IPacketDeviceFactory
+/// <summary>
+/// A factory that opens nothing, reporting the given reason code.
+///
+/// The code is what the tests assert on: the service no longer sends prose, so the English
+/// sentence that travels beside it is a service-log detail and nothing a test should pin.
+/// </summary>
+internal sealed class UnavailableDevices(string code = ReasonCodes.RecordingNoNpcap)
+    : IPacketDeviceFactory
 {
-    public PacketDeviceSet OpenAll(int snapLength) => PacketDeviceSet.Unavailable(reason);
+    public PacketDeviceSet OpenAll(int snapLength) =>
+        PacketDeviceSet.Unavailable($"Unavailable in a test ({code}).", code);
 }
 
 /// <summary>A socket table reporting the target's ports, changeable mid-test.</summary>

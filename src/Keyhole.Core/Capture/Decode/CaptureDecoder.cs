@@ -46,7 +46,8 @@ public sealed class CaptureDecoder(ILogger<CaptureDecoder>? logger = null)
         {
             return DecodeResult.Failed(
                 "This session has no packet capture. Packet recording needs Npcap; the " +
-                "TLS keylog was collected either way.");
+                "TLS keylog was collected either way.",
+                Ipc.ReasonCodes.DecodeFileMissing);
         }
 
         try
@@ -55,14 +56,18 @@ public sealed class CaptureDecoder(ILogger<CaptureDecoder>? logger = null)
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return DecodeResult.Failed($"The capture file could not be read: {ex.Message}");
+            return DecodeResult.Failed(
+                $"The capture file could not be read: {ex.Message}",
+                Ipc.ReasonCodes.DecodeUnreadable);
         }
         catch (Exception ex)
         {
             // Decoding parses hostile-shaped data by nature. A crash here must not take
             // the service down, and the user is better served by a reason than a silence.
             _logger.LogError(ex, "Decoding {Path} failed.", pcapngPath);
-            return DecodeResult.Failed($"The capture could not be decoded: {ex.Message}");
+            return DecodeResult.Failed(
+                $"The capture could not be decoded: {ex.Message}",
+                Ipc.ReasonCodes.DecodeFailed);
         }
     }
 
@@ -190,6 +195,7 @@ public sealed class CaptureDecoder(ILogger<CaptureDecoder>? logger = null)
                 ? $"The capture holds more than {MaxConversations} connections; only the " +
                   "first were decoded."
                 : null,
+            FailureCode = overflowed ? Ipc.ReasonCodes.DecodeTooManyConversations : null,
         };
     }
 }

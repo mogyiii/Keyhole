@@ -1,5 +1,6 @@
 using Keyhole.Core.Capture;
 using Keyhole.Core.Capture.Recording;
+using Keyhole.Core.Ipc;
 using Keyhole.Core.Storage;
 
 namespace Keyhole.Tests;
@@ -90,7 +91,7 @@ public class CapturePacketWiringTests : IDisposable
     [Fact]
     public void Without_npcap_the_session_still_starts_and_explains_itself()
     {
-        var service = Build(new UnavailableDevices("Npcap is not installed."));
+        var service = Build(new UnavailableDevices());
 
         var session = Launch(service);
 
@@ -99,12 +100,12 @@ public class CapturePacketWiringTests : IDisposable
         Assert.NotNull(session.KeylogFile);
         Assert.Null(session.PcapFile);
 
-        Assert.Equal("Npcap is not installed.", service.GetRecordingIssue(session.Id));
+        Assert.Equal(ReasonCodes.RecordingNoNpcap, service.GetRecordingIssue(session.Id));
 
         // And it survives the session ending. The UI shows a note against finished
         // captures too, and this is exactly the note a finished keylog-only session needs.
         service.Stop(session.Id);
-        Assert.Equal("Npcap is not installed.", service.GetRecordingIssue(session.Id));
+        Assert.Equal(ReasonCodes.RecordingNoNpcap, service.GetRecordingIssue(session.Id));
     }
 
     [Fact]
@@ -145,7 +146,7 @@ public class CapturePacketWiringTests : IDisposable
     [Fact]
     public void The_pcap_size_is_reported_only_when_there_is_a_pcap()
     {
-        var service = Build(new UnavailableDevices("No adapter."));
+        var service = Build(new UnavailableDevices(ReasonCodes.RecordingNoAdapter));
 
         // Zero for a session with no capture, so the UI can show an em dash rather than
         // "0 B" — which would read as an empty recording rather than none at all.

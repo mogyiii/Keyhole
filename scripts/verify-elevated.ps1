@@ -156,9 +156,9 @@ if (-not $status.isElevated) {
 # --- 2. ETW byte counting ---------------------------------------------------
 
 Write-Host "`nByte counting (ETW)" -ForegroundColor Cyan
-Write-Check (-not $status.byteCountingUnavailableReason) "ETW session started"
-if ($status.byteCountingUnavailableReason) {
-    Write-Host "    reason: $($status.byteCountingUnavailableReason)" -ForegroundColor Yellow
+Write-Check (-not $status.byteCountingUnavailable) "ETW session started"
+if ($status.byteCountingUnavailable) {
+    Write-Host "    reason code: $($status.byteCountingUnavailable)" -ForegroundColor Yellow
 } else {
     # Generate traffic, then look for a non-zero total somewhere in the app list.
     try { Invoke-WebRequest -Uri 'https://example.com' -UseBasicParsing -TimeoutSec 10 | Out-Null } catch {}
@@ -176,9 +176,9 @@ if ($status.byteCountingUnavailableReason) {
 # --- 3. Blocking ------------------------------------------------------------
 
 Write-Host "`nBlocking (Windows Firewall)" -ForegroundColor Cyan
-Write-Check (-not $status.blockingUnavailableReason) "firewall is writable"
-if ($status.blockingUnavailableReason) {
-    Write-Host "    reason: $($status.blockingUnavailableReason)" -ForegroundColor Yellow
+Write-Check (-not $status.blockingUnavailable) "firewall is writable"
+if ($status.blockingUnavailable) {
+    Write-Host "    reason code: $($status.blockingUnavailable)" -ForegroundColor Yellow
     exit 1
 }
 
@@ -245,10 +245,9 @@ finally {
 Write-Host "`nPacket capture (Npcap)" -ForegroundColor Cyan
 
 Write-Host "    npcap state: $($status.npcapState) $($status.npcapVersion)"
-Write-Check (-not $status.packetCaptureUnavailableReason) "Npcap is ready"
+Write-Check ($status.npcapState -eq 'ready') "Npcap is ready"
 
-if ($status.packetCaptureUnavailableReason) {
-    Write-Host "    reason: $($status.packetCaptureUnavailableReason)" -ForegroundColor Yellow
+if ($status.npcapState -ne 'ready') {
     Write-Host "    Skipping the capture checks. Install Npcap to verify them." -ForegroundColor Yellow
 } else {
     # A browser, because the point is to exercise the whole chain: an application that
@@ -306,7 +305,19 @@ if ($status.packetCaptureUnavailableReason) {
             Write-Host "`n  Decoding the capture" -ForegroundColor Cyan
             $decoded = Invoke-Keyhole -Method 'decode-capture' -ParamsJson (@{ sessionId = $session.id } | ConvertTo-Json -Compress)
 
-            Write-Host "    $($decoded.summary)"
+            # The service sends counts, not a sentence: the interface composes the summary
+            # in the user's language, so this script composes its own.
+            Write-Host ("    {0} conversations: {1} decrypted, {2} without keys, {3} missing a handshake, {4} failed" -f `
+                $decoded.conversations, $decoded.decrypted, $decoded.encryptedWithoutKeys, `
+                $decoded.handshakeMissing, $decoded.decryptionFailed)
+
+            if ($decoded.quicBytes -gt 0) {
+                Write-Host "    $($decoded.quicBytes) bytes of QUIC were skipped (not decodable)"
+            }
+
+            if ($decoded.failure) {
+                Write-Host "    failure code: $($decoded.failure)" -ForegroundColor Yellow
+            }
             Write-Check ($decoded.decrypted -gt 0) "TLS connections were decrypted ($($decoded.decrypted) of $($decoded.conversations))"
             Write-Check (@($decoded.exchanges).Count -gt 0) "requests were recovered ($(@($decoded.exchanges).Count))"
 

@@ -556,10 +556,57 @@ megírni.
 
 ---
 
+### Magyarítás és angol README ✅
+
+Az `InvariantGlobalization` ki volt kapcsolva — invariant módban a magyar kultúra be sem
+töltődik —, de a `System.Globalization.UseNls=true` miatt **nem kerül ICU a csomagba**:
+a Windows saját NLS-ét használja, amit a telepítő eddig is feltételezett.
+
+**A szolgáltatás nem küld többé angol prózát.** Ez volt a döntés magja, és nem
+kényelemből: amit a szolgáltatás mondott, az pont a magyarázó szöveg volt — a „miért nulla
+minden", a „miért nem olvasható ez a kapcsolat" —, vagyis **pont ott lett volna angol a
+felület, ahol a felhasználónak a legjobban kell a saját nyelve**. Most a szolgáltatás azt
+mondja meg, *mi* a baj (`recording-no-npcap`, `not-elevated`), a felület pedig szavakba
+önti. Ami nem fordítható — útvonal, verzió, méret — **saját mezőben utazik a kód mellett**,
+nem a mondatba sütve. A szolgáltatás naplója angol marad: azt az olvassa, aki hibát keres,
+és egy angol napló könnyebben kereshető.
+
+Négy teszt védi, mert mindegyik más hibát fog meg, és **egyik sem fordítási hiba**:
+hiányzó fordítás nem dob kivételt, hanem kulcsot vagy angol mondatot rajzol egy magyar
+ablakba, és átmegy a review-n, mert a címkéket senki nem olvassa el mind minden alkalommal.
+
+| Teszt | Mit fog meg |
+|---|---|
+| `Both_languages_define_exactly_the_same_keys` | lefordítatlan és elárvult kulcs, név szerint |
+| `Every_key_the_markup_asks_for_exists` | a XAML olyan kulcsot kér, amit semmi nem ad |
+| `Every_defined_key_is_actually_used` | halott sztring — kétszer fordítva, örökké review-zva |
+| `Every_code_the_service_can_send_has_a_sentence` | **a rés, amit a többi nem lát** |
+
+Az utolsó a lényeges. A kódok a `Keyhole.Core`-ban élnek, a mondatok a `Keyhole.App`-ban:
+egy felvett kód fordítás nélkül **lefordul, és nem buktat el resx-összehasonlítást** sem —
+egyszerűen nyers `recording-no-npcap` néven érkezik a felhasználóhoz. A teszt ezért
+reflexióval járja be a `ReasonCodes` konstansait, mindkét nyelven, és már az írásakor
+elkapott hármat (`block-no-executable`, `block-no-rule`, `block-rule-failed`), amikhez a
+blokkolási útvonal kódra állítása közben nem írtam mondatot.
+
+Két részlet, ami nem magától értetődő:
+
+- **A kötés indexelőn megy, nem generált property-n.** Egy `DataGrid` oszlopfejléc a
+  vizuális fán kívül van, és nincs DataContextje, amin keresztül egy view modelt elérne —
+  ezért a `{l:Translate Kulcs}` a `Loc` singletonra kötődik közvetlenül.
+- **A nyelvváltás nem kér újraindítást.** A `Loc.SetCulture` egy üres nevű
+  `PropertyChanged`-et vált ki („minden megváltozott"), ami kulcsonkénti feliratkozás
+  nélkül újrarajzolja az ablakot. A listasorok viszont a konstruktorukban formázzák a
+  szövegüket, szóval azokat **újra kell építeni**, nem elég értesíteni.
+
+A README teljesen angol lett, a kiadási jegyzetek magyarok maradtak.
+
+---
+
 ## Következő lépés
 
-M1–M8 kész és élesben ellenőrizve, a top hostok panel és a GeoIP megvan. **298 teszt, mind
-zöld**, hatszor egymás után.
+M1–M8 kész és élesben ellenőrizve, a top hostok panel, a GeoIP és a magyarítás megvan.
+**314 teszt, mind zöld.**
 
 A `plan.txt` eredeti céljai teljesültek. Ami nyitva maradt:
 

@@ -189,11 +189,14 @@ public static class Http2Parser
             }
         }
 
-        if (decoder.Error is { } error)
+        if (decoder.IsBroken)
         {
+            // HPACK is stateful, so once decoding breaks every later header block on this
+            // connection is suspect too -- which is why the flag goes on every stream
+            // rather than only on the one that failed.
             foreach (var stream in streams.Values)
             {
-                stream.Incomplete ??= error;
+                stream.Incomplete ??= Ipc.ReasonCodes.ExchangeHeadersBroken;
             }
         }
     }
@@ -347,13 +350,13 @@ internal sealed class Http2Stream
 
         if (incomplete is null && ResponseHeaders.Count == 0)
         {
-            incomplete = "no response was captured for this request";
+            incomplete = Ipc.ReasonCodes.ExchangeNoResponse;
         }
         else if (incomplete is null && !ResponseComplete)
         {
             // The response was still arriving when the capture stopped, so its body size
             // is a floor rather than a total.
-            incomplete = "the response was still arriving when the capture ended";
+            incomplete = Ipc.ReasonCodes.ExchangeResponseTruncated;
         }
 
         return new DecodedExchange

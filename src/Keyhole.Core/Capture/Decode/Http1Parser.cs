@@ -76,7 +76,7 @@ public static class Http1Parser
                 RequestedUtc = requestedUtc,
                 RespondedUtc = response is null ? null : respondedUtc,
                 Incomplete = response is null
-                    ? "no response was captured for this request"
+                    ? Ipc.ReasonCodes.ExchangeNoResponse
                     : response.Incomplete,
             });
         }
@@ -259,7 +259,7 @@ public static class Http1Parser
             if (end > stream.Length)
             {
                 // The body was still arriving when the capture stopped.
-                message.Incomplete = "the body was still arriving when the capture ended";
+                message.Incomplete = Ipc.ReasonCodes.ExchangeBodyTruncated;
                 return (int)stream.Length;
             }
 
@@ -291,7 +291,7 @@ public static class Http1Parser
 
             if (lineEnd < 0)
             {
-                message.Incomplete = "the chunked body was cut off when the capture ended";
+                message.Incomplete = Ipc.ReasonCodes.ExchangeBodyTruncated;
                 return (int)stream.Length;
             }
 
@@ -307,7 +307,7 @@ public static class Http1Parser
                     System.Globalization.CultureInfo.InvariantCulture,
                     out var chunkSize))
             {
-                message.Incomplete = "the chunked body could not be followed";
+                message.Incomplete = Ipc.ReasonCodes.ExchangeBodyTruncated;
                 return (int)stream.Length;
             }
 

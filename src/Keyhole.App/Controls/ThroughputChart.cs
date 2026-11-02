@@ -152,8 +152,11 @@ public sealed class ThroughputChart : Control
     private void DrawPlaceholder(DrawingContext context, Rect plot)
     {
         var text = new FormattedText(
-            "Collecting data…",
-            CultureInfo.InvariantCulture,
+            Localization.Loc.Current["ChartCollecting"],
+
+            // The current culture, not the invariant one: the text is translated now, and
+            // FormattedText uses the culture for shaping as well as for numbers.
+            CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight,
             Typeface.Default,
             11,

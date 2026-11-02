@@ -29,12 +29,15 @@ public static class PcapngSecretsInjector
     {
         if (string.IsNullOrWhiteSpace(keylogContents))
         {
-            return InjectionResult.NothingToDo("The application wrote no TLS secrets.");
+            return InjectionResult.NothingToDo(
+                "The application wrote no TLS secrets.",
+                Ipc.ReasonCodes.RecordingNoSecrets);
         }
 
         if (!File.Exists(pcapngPath))
         {
-            return InjectionResult.NothingToDo("No packets were recorded.");
+            return InjectionResult.NothingToDo(
+                "No packets were recorded.", Ipc.ReasonCodes.DecodeNoCapture);
         }
 
         var temporary = pcapngPath + ".rewriting";
@@ -195,11 +198,17 @@ public static class PcapngSecretsInjector
 /// Null when it worked and there is nothing to say; otherwise a sentence explaining what
 /// the user will have to do by hand instead.
 /// </param>
-public sealed record InjectionResult(bool Succeeded, string? Detail)
+/// <param name="DetailCode">
+/// The same answer as a code the UI can translate, from <see cref="Ipc.ReasonCodes"/>.
+/// The sentence above is for the log.
+/// </param>
+public sealed record InjectionResult(bool Succeeded, string? Detail, string? DetailCode = null)
 {
     public static InjectionResult Injected() => new(true, null);
 
-    public static InjectionResult NothingToDo(string detail) => new(false, detail);
+    public static InjectionResult NothingToDo(string detail, string code) =>
+        new(false, detail, code);
 
-    public static InjectionResult Failed(string detail) => new(false, detail);
+    public static InjectionResult Failed(string detail) =>
+        new(false, detail, Ipc.ReasonCodes.RecordingSecretsNotEmbedded);
 }

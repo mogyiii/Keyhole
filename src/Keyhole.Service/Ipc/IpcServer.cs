@@ -213,16 +213,20 @@ public sealed class GetStatusHandler(
             // that is running but has not produced its first sample yet.
             MonitorState = monitor is null ? null : monitor.HasSampled ? "running" : "idle",
             ActiveConnections = monitor?.ActiveConnections,
-            ByteCountingUnavailableReason = monitor?.ByteCountingUnavailableReason,
-            BlockingUnavailableReason = blocking is { CanModifyRules: false }
-                ? blocking.UnavailableReason
+
+            // Codes rather than sentences: the interface exists in two languages, and the
+            // explanatory text is exactly where a user needs their own. The sentences
+            // still go to the service log.
+            ByteCountingUnavailable = monitor?.ByteCountingUnavailableCode,
+            BlockingUnavailable = blocking is { CanModifyRules: false }
+                ? blocking.UnavailableCode
                 : null,
 
-            PacketCaptureUnavailableReason = packetCapture?.UnavailableReason,
             NpcapState = packetCapture?.State.ToString().ToLowerInvariant(),
             NpcapVersion = packetCapture?.Version,
 
-            GeoIpUnavailableReason = geoIp?.UnavailableReason,
+            GeoIpUnavailable = geoIp?.UnavailableCode,
+            GeoIpDirectory = geoIp?.Directory,
         };
 
         return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(status, IpcChannel.Json));

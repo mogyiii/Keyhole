@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
-  <!--
-    The neutral language: English. Hungarian lives in Strings.hu.resx, and a test asserts
-    the two define exactly the same keys, so an untranslated string fails the build rather
-    than appearing in the interface.
-  -->
+  <!-- The neutral language: English. Hungarian lives in Strings.hu.resx, and a test asserts the two define exactly the same keys, so an untranslated string fails the build rather than appearing in the interface. -->
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
     <xsd:element name="root" msdata:IsDataSet="true">
@@ -64,10 +60,496 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
 
+  <data name="StatusChecking" xml:space="preserve">
+    <value>Checking the Keyhole service…</value>
+  </data>
+  <data name="ThemeAuto" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="ThemeLight" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="ThemeDark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="BlockedLabel" xml:space="preserve">
+    <value>Blocked</value>
+  </data>
+  <data name="ThemeTooltip" xml:space="preserve">
+    <value>Switch between automatic, light and dark</value>
+  </data>
+  <data name="BlockAnApp" xml:space="preserve">
+    <value>Block an app…</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Throughput" xml:space="preserve">
+    <value>Throughput</value>
+  </data>
+  <data name="Upload" xml:space="preserve">
+    <value>Upload</value>
+  </data>
+  <data name="Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Applications" xml:space="preserve">
+    <value>Applications</value>
+  </data>
+  <data name="SearchApps" xml:space="preserve">
+    <value>Search apps, publishers, hosts…</value>
+  </data>
+  <data name="BlockSelected" xml:space="preserve">
+    <value>Block selected</value>
+  </data>
+  <data name="ColApplication" xml:space="preserve">
+    <value>Application</value>
+  </data>
+  <data name="ColPublisher" xml:space="preserve">
+    <value>Publisher</value>
+  </data>
+  <data name="ColSignature" xml:space="preserve">
+    <value>Signature</value>
+  </data>
+  <data name="ColConnections" xml:space="preserve">
+    <value>Conns</value>
+  </data>
+  <data name="ColRate" xml:space="preserve">
+    <value>Rate</value>
+  </data>
+  <data name="ColTotal" xml:space="preserve">
+    <value>Total</value>
+  </data>
+  <data name="ColRecentHosts" xml:space="preserve">
+    <value>Recent hosts</value>
+  </data>
+  <data name="TabConnections" xml:space="preserve">
+    <value>Connections</value>
+  </data>
+  <data name="SelectAnApplication" xml:space="preserve">
+    <value>Select an application above to see its connections.</value>
+  </data>
+  <data name="ColProtocol" xml:space="preserve">
+    <value>Proto</value>
+  </data>
+  <data name="ColPid" xml:space="preserve">
+    <value>PID</value>
+  </data>
+  <data name="ColLocal" xml:space="preserve">
+    <value>Local</value>
+  </data>
+  <data name="ColRemote" xml:space="preserve">
+    <value>Remote</value>
+  </data>
+  <data name="ColPort" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="ColCountry" xml:space="preserve">
+    <value>CC</value>
+  </data>
+  <data name="ColOperator" xml:space="preserve">
+    <value>Operator</value>
+  </data>
+  <data name="ChartCollecting" xml:space="preserve">
+    <value>Collecting data…</value>
+  </data>
+  <data name="PickerTitle" xml:space="preserve">
+    <value>Choose an application</value>
+  </data>
+  <data name="PickerPrograms" xml:space="preserve">
+    <value>Programs</value>
+  </data>
+  <data name="RuleExecutableChanged" xml:space="preserve">
+    <value>⚠ The program has changed since this rule was created.</value>
+  </data>
+  <data name="ColState" xml:space="preserve">
+    <value>State</value>
+  </data>
+  <data name="ColTraffic" xml:space="preserve">
+    <value>Traffic</value>
+  </data>
+  <data name="TabHosts" xml:space="preserve">
+    <value>Hosts</value>
+  </data>
+  <data name="HostsIntro" xml:space="preserve">
+    <value>Destinations ranked by traffic, across every application. The list above answers what one program is doing; this answers it from the other end — a host several unrelated programs all talk to is worth a look. Loopback is excluded.</value>
+  </data>
+  <data name="SearchHosts" xml:space="preserve">
+    <value>Search hosts, apps, addresses, ports…</value>
+  </data>
+  <data name="NoHosts" xml:space="preserve">
+    <value>No outbound destinations yet.</value>
+  </data>
+  <data name="ColHost" xml:space="preserve">
+    <value>Host</value>
+  </data>
+  <data name="ColPorts" xml:space="preserve">
+    <value>Ports</value>
+  </data>
+  <data name="ColLastSeen" xml:space="preserve">
+    <value>Last seen</value>
+  </data>
+  <data name="TabBlockedApps" xml:space="preserve">
+    <value>Blocked apps</value>
+  </data>
+  <data name="NothingBlocked" xml:space="preserve">
+    <value>Nothing is blocked. Use "Block an app…" or select an application above.</value>
+  </data>
+  <data name="ColPath" xml:space="preserve">
+    <value>Path</value>
+  </data>
+  <data name="ColDirection" xml:space="preserve">
+    <value>Direction</value>
+  </data>
+  <data name="ColCreated" xml:space="preserve">
+    <value>Created</value>
+  </data>
+  <data name="Unblock" xml:space="preserve">
+    <value>Unblock</value>
+  </data>
+  <data name="TabCapture" xml:space="preserve">
+    <value>Capture</value>
+  </data>
+  <data name="CaptureIntro" xml:space="preserve">
+    <value>Keyhole launches the application with SSLKEYLOGFILE set for that process only, and records its packets alongside. The capture carries its own TLS keys, so Wireshark opens it decrypted with nothing to configure. Applications on Windows' own TLS stack write no keys and stay encrypted.</value>
+  </data>
+  <data name="GetNpcap" xml:space="preserve">
+    <value>Get Npcap…</value>
+  </data>
+  <data name="GetNpcapTooltip" xml:space="preserve">
+    <value>Downloads the installer from npcap.com and verifies its signature before running it. Keyhole does not redistribute Npcap.</value>
+  </data>
+  <data name="LaunchWithKeyLogging" xml:space="preserve">
+    <value>Launch app with key logging…</value>
+  </data>
+  <data name="NoCaptures" xml:space="preserve">
+    <value>No captures yet.</value>
+  </data>
+  <data name="ColStatus" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="ColStarted" xml:space="preserve">
+    <value>Started</value>
+  </data>
+  <data name="ColTlsKeys" xml:space="preserve">
+    <value>TLS keys</value>
+  </data>
+  <data name="ColPackets" xml:space="preserve">
+    <value>Packets</value>
+  </data>
+  <data name="Stop" xml:space="preserve">
+    <value>Stop</value>
+  </data>
+  <data name="Requests" xml:space="preserve">
+    <value>Requests</value>
+  </data>
+  <data name="RequestsTooltip" xml:space="preserve">
+    <value>Decrypts the capture with this session's own TLS keys and lists what the application asked for.</value>
+  </data>
+  <data name="Wireshark" xml:space="preserve">
+    <value>Wireshark</value>
+  </data>
+  <data name="WiresharkTooltip" xml:space="preserve">
+    <value>Opens the capture in Wireshark. The TLS keys are inside the file, so no keylog path needs setting.</value>
+  </data>
+  <data name="Folder" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="ColTime" xml:space="preserve">
+    <value>Time</value>
+  </data>
+  <data name="ColMethod" xml:space="preserve">
+    <value>Method</value>
+  </data>
+  <data name="ColUrl" xml:space="preserve">
+    <value>URL</value>
+  </data>
+  <data name="ColType" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="ColSize" xml:space="preserve">
+    <value>Size</value>
+  </data>
+  <data name="ColTook" xml:space="preserve">
+    <value>Took</value>
+  </data>
+  <data name="TabSettings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
   <data name="SettingsLanguage" xml:space="preserve">
     <value>Language</value>
   </data>
   <data name="SettingsLanguageAuto" xml:space="preserve">
     <value>System language</value>
+  </data>
+  <data name="SettingsCloseToTray" xml:space="preserve">
+    <value>Close to the tray instead of exiting</value>
+  </data>
+  <data name="SettingsStartWithWindows" xml:space="preserve">
+    <value>Start Keyhole when I sign in</value>
+  </data>
+  <data name="SettingsResolveHostnames" xml:space="preserve">
+    <value>Resolve remote addresses to hostnames</value>
+  </data>
+  <data name="SettingsKeepHistoryFor" xml:space="preserve">
+    <value>Keep flow history for</value>
+  </data>
+  <data name="SettingsDays" xml:space="preserve">
+    <value>days</value>
+  </data>
+  <data name="SettingsStopRecordingAfter" xml:space="preserve">
+    <value>Stop recording packets after</value>
+  </data>
+  <data name="SettingsMbPerSession" xml:space="preserve">
+    <value>MB per session</value>
+  </data>
+  <data name="SettingsPcapLimitNote" xml:space="preserve">
+    <value>A browser session can produce hundreds of megabytes in minutes. At the limit the packet recording stops and says so; the session keeps running and keeps collecting TLS keys. Takes effect for captures started after the service restarts.</value>
+  </data>
+  <data name="SettingsDataNote" xml:space="preserve">
+    <value>Flow history, rules and captures live in %ProgramData%\Keyhole. A capture folder holds the recorded packets and the TLS keys that decrypt them, in one place — treat it as sensitive as the traffic itself.</value>
+  </data>
+  <data name="StateUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="StateConnecting" xml:space="preserve">
+    <value>Connecting</value>
+  </data>
+  <data name="StateConnected" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="StateUnavailable" xml:space="preserve">
+    <value>Unavailable</value>
+  </data>
+  <data name="StateError" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="CaptureStatusRunning" xml:space="preserve">
+    <value>Capturing</value>
+  </data>
+  <data name="CaptureStatusFinished" xml:space="preserve">
+    <value>Finished</value>
+  </data>
+  <data name="StatusApps" xml:space="preserve">
+    <value>{0} apps, {1} active connections.</value>
+  </data>
+  <data name="StatusServiceUnreachable" xml:space="preserve">
+    <value>Service unreachable: {0}</value>
+  </data>
+  <data name="StatusServiceError" xml:space="preserve">
+    <value>Service error ({0}): {1}</value>
+  </data>
+  <data name="StatusServiceSilent" xml:space="preserve">
+    <value>Service did not answer within 5 seconds.</value>
+  </data>
+  <data name="CapabilityNotElevated" xml:space="preserve">
+    <value>The service is not elevated, so {0} are unavailable. Connection monitoring still works.</value>
+  </data>
+  <data name="CapabilityByteCounting" xml:space="preserve">
+    <value>byte counting</value>
+  </data>
+  <data name="CapabilityBlocking" xml:space="preserve">
+    <value>blocking</value>
+  </data>
+  <data name="CapabilityAnd" xml:space="preserve">
+    <value> and </value>
+  </data>
+  <data name="ReasonNotElevated" xml:space="preserve">
+    <value>The service is not running with administrator rights.</value>
+  </data>
+  <data name="ReasonEtwUnavailable" xml:space="preserve">
+    <value>The trace session could not be started, so traffic volumes read zero.</value>
+  </data>
+  <data name="ReasonFirewallUnreachable" xml:space="preserve">
+    <value>Windows Firewall could not be reached.</value>
+  </data>
+  <data name="ReasonBlockNoExecutable" xml:space="preserve">
+    <value>There is no program at that path, so there is nothing to block.</value>
+  </data>
+  <data name="ReasonBlockNoRule" xml:space="preserve">
+    <value>That rule no longer exists.</value>
+  </data>
+  <data name="ReasonBlockRuleFailed" xml:space="preserve">
+    <value>Windows Firewall refused the change. The service log has the details.</value>
+  </data>
+  <data name="ReasonGeoIpNone" xml:space="preserve">
+    <value>No GeoIP database found. Put GeoLite2-Country.mmdb and GeoLite2-ASN.mmdb in {0} to see countries and network operators. Keyhole does not download them: they are MaxMind's and need a free account.</value>
+  </data>
+  <data name="ReasonGeoIpNoCountry" xml:space="preserve">
+    <value>No country database in {0}; add GeoLite2-Country.mmdb to see countries.</value>
+  </data>
+  <data name="ReasonGeoIpNoAsn" xml:space="preserve">
+    <value>No ASN database in {0}; add GeoLite2-ASN.mmdb to see network operators.</value>
+  </data>
+  <data name="ReasonRecordingNoNpcap" xml:space="preserve">
+    <value>no packets: Npcap is unavailable</value>
+  </data>
+  <data name="ReasonRecordingNoAdapter" xml:space="preserve">
+    <value>no packets: no capture adapter could be opened</value>
+  </data>
+  <data name="ReasonRecordingFileError" xml:space="preserve">
+    <value>no packets: the capture file could not be created</value>
+  </data>
+  <data name="ReasonRecordingSizeLimit" xml:space="preserve">
+    <value>recording stopped at the size limit</value>
+  </data>
+  <data name="ReasonRecordingNoSecrets" xml:space="preserve">
+    <value>no TLS keys were written</value>
+  </data>
+  <data name="ReasonRecordingSecretsNotEmbedded" xml:space="preserve">
+    <value>the TLS keys are in the keylog beside the capture, not inside it</value>
+  </data>
+  <data name="ReasonDecodeNoCapture" xml:space="preserve">
+    <value>This session recorded no packets, so there is nothing to decode. Packet recording needs Npcap.</value>
+  </data>
+  <data name="ReasonDecodeFileMissing" xml:space="preserve">
+    <value>The capture file is gone.</value>
+  </data>
+  <data name="ReasonDecodeUnreadable" xml:space="preserve">
+    <value>The capture file could not be read.</value>
+  </data>
+  <data name="ReasonDecodeTooMany" xml:space="preserve">
+    <value>The capture holds more connections than can be decoded at once; only the first were read.</value>
+  </data>
+  <data name="ReasonDecodeFailed" xml:space="preserve">
+    <value>The capture could not be decoded.</value>
+  </data>
+  <data name="ReasonExchangeNoResponse" xml:space="preserve">
+    <value>no response was captured</value>
+  </data>
+  <data name="ReasonExchangeResponseTruncated" xml:space="preserve">
+    <value>the response was still arriving when the capture ended</value>
+  </data>
+  <data name="ReasonExchangeBodyTruncated" xml:space="preserve">
+    <value>the body was cut off when the capture ended</value>
+  </data>
+  <data name="ReasonExchangeHeadersBroken" xml:space="preserve">
+    <value>the headers could not be decompressed</value>
+  </data>
+  <data name="ReasonCaptureNoExecutable" xml:space="preserve">
+    <value>There is no program at that path.</value>
+  </data>
+  <data name="ReasonCaptureLaunchFailed" xml:space="preserve">
+    <value>The application could not be started.</value>
+  </data>
+  <data name="NpcapMissing" xml:space="preserve">
+    <value>Npcap is not installed, so Keyhole cannot record packets. TLS key logging works without it.</value>
+  </data>
+  <data name="NpcapStopped" xml:space="preserve">
+    <value>Npcap is installed but its driver is not running. Start the 'npcap' service to record packets.</value>
+  </data>
+  <data name="NpcapUnusable" xml:space="preserve">
+    <value>Npcap is installed but its library could not be found. Reinstalling Npcap should restore it.</value>
+  </data>
+  <data name="KeylogUnlikely" xml:space="preserve">
+    <value>uses Windows TLS, which ignores SSLKEYLOGFILE</value>
+  </data>
+  <data name="KeylogNoneYet" xml:space="preserve">
+    <value>no keys yet — may use Windows TLS</value>
+  </data>
+  <data name="KeylogNoneWritten" xml:space="preserve">
+    <value>no keys were written</value>
+  </data>
+  <data name="DecodeRequests" xml:space="preserve">
+    <value>{0} requests</value>
+  </data>
+  <data name="DecodeOneRequest" xml:space="preserve">
+    <value>1 request</value>
+  </data>
+  <data name="DecodeDecrypted" xml:space="preserve">
+    <value>{0} of {1} TLS connections decrypted</value>
+  </data>
+  <data name="DecodeNoneDecrypted" xml:space="preserve">
+    <value>none of {0} connections could be decrypted</value>
+  </data>
+  <data name="DecodeNoKeys" xml:space="preserve">
+    <value>{0} had no key in the capture (these use Windows' own TLS, which ignores SSLKEYLOGFILE)</value>
+  </data>
+  <data name="DecodeNoHandshake" xml:space="preserve">
+    <value>{0} had no handshake in the capture, so nothing identified them (either they predate the recording or their first packets were missed)</value>
+  </data>
+  <data name="DecodeFailedCount" xml:space="preserve">
+    <value>{0} had a key that Keyhole could not use</value>
+  </data>
+  <data name="DecodeQuic" xml:space="preserve">
+    <value>{0} KB of QUIC/HTTP3 was recorded but cannot be decoded</value>
+  </data>
+  <data name="DecodeTruncated" xml:space="preserve">
+    <value>{0} further requests are not shown</value>
+  </data>
+  <data name="DecodeInProgress" xml:space="preserve">
+    <value>Decoding {0}…</value>
+  </data>
+  <data name="DecodeNoAnswer" xml:space="preserve">
+    <value>The service did not finish decoding this capture.</value>
+  </data>
+  <data name="ActionNoPath" xml:space="preserve">
+    <value>This entry has no readable executable path, so it cannot be blocked.</value>
+  </data>
+  <data name="ActionBlocked" xml:space="preserve">
+    <value>Blocked {0}.</value>
+  </data>
+  <data name="ActionUnblocked" xml:space="preserve">
+    <value>Unblocked {0}.</value>
+  </data>
+  <data name="ActionBlockFailed" xml:space="preserve">
+    <value>The service did not respond; nothing was blocked.</value>
+  </data>
+  <data name="ActionUnblockFailed" xml:space="preserve">
+    <value>The service did not respond; the rule was not removed.</value>
+  </data>
+  <data name="ActionCaptureStartFailed" xml:space="preserve">
+    <value>The service did not respond; nothing was started.</value>
+  </data>
+  <data name="ActionCaptureStopFailed" xml:space="preserve">
+    <value>The service did not respond; the capture was not stopped.</value>
+  </data>
+  <data name="ActionCaptureStarted" xml:space="preserve">
+    <value>Capturing {0}. TLS keys go to {1}.</value>
+  </data>
+  <data name="ActionCaptureStartedSchannel" xml:space="preserve">
+    <value>Started {0}, but it uses Windows' TLS stack, which ignores SSLKEYLOGFILE. No keys will be written.</value>
+  </data>
+  <data name="ActionCaptureStartedUnknown" xml:space="preserve">
+    <value>Started {0}. If the keylog stays at zero bytes, this application uses Windows' TLS stack and cannot be captured this way.</value>
+  </data>
+  <data name="ActionCaptureStopped" xml:space="preserve">
+    <value>Stopped capturing {0}. The application is still running.</value>
+  </data>
+  <data name="ActionNoPcap" xml:space="preserve">
+    <value>This session recorded no packets, so there is nothing to open.</value>
+  </data>
+  <data name="ActionOpenedInWireshark" xml:space="preserve">
+    <value>Opened in Wireshark. The TLS keys are inside the capture, so it decrypts itself.</value>
+  </data>
+  <data name="ActionOpenedInWiresharkNoKeys" xml:space="preserve">
+    <value>Opened in Wireshark. This session wrote no TLS keys, so the traffic stays encrypted.</value>
+  </data>
+  <data name="ActionOpenedWithDefault" xml:space="preserve">
+    <value>Opened {0} with its registered application.</value>
+  </data>
+  <data name="ActionOpenFailed" xml:space="preserve">
+    <value>Could not open the capture: {0}</value>
+  </data>
+  <data name="ActionFolderOpenFailed" xml:space="preserve">
+    <value>Could not open {0}.</value>
+  </data>
+  <data name="ActionSettingsSaveFailed" xml:space="preserve">
+    <value>Could not save settings: {0}</value>
+  </data>
+  <data name="ActionStartupFailed" xml:space="preserve">
+    <value>Could not update the sign-in startup entry.</value>
+  </data>
+  <data name="NpcapDownloading" xml:space="preserve">
+    <value>Downloading Npcap {0} from npcap.com…</value>
+  </data>
+  <data name="NpcapInstallerRunning" xml:space="preserve">
+    <value>Npcap's installer is running. Captures will record packets once it finishes — no need to restart Keyhole.</value>
+  </data>
+  <data name="NpcapInstallerNotStarted" xml:space="preserve">
+    <value>The Npcap installer was downloaded and verified but not started. Run it yourself from {0}, or install from {1}.</value>
+  </data>
+  <data name="NpcapFetchFailed" xml:space="preserve">
+    <value>Could not fetch Npcap ({0}). Install it from {1}.</value>
   </data>
 </root>

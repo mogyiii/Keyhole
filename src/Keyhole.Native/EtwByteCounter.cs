@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Principal;
+using Keyhole.Core.Ipc;
 using Keyhole.Core.Monitoring;
 using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
@@ -36,6 +37,12 @@ public sealed class EtwByteCounter : IByteCounterSource, IDisposable
     public string? UnavailableReason { get; private set; }
 
     /// <summary>
+    /// The same answer as a code the UI can translate. Set together with the sentence
+    /// above, which stays English for the log.
+    /// </summary>
+    public string? UnavailableCode { get; private set; }
+
+    /// <summary>
     /// Starts the trace session. Returns false and sets <see cref="UnavailableReason"/>
     /// instead of throwing: monitoring must still work without byte counts.
     /// </summary>
@@ -49,6 +56,7 @@ public sealed class EtwByteCounter : IByteCounterSource, IDisposable
         if (!IsElevated())
         {
             UnavailableReason = "Byte counting needs administrator rights; the service is not elevated.";
+            UnavailableCode = ReasonCodes.NotElevated;
             _logger.LogWarning("{Reason}", UnavailableReason);
             return false;
         }
@@ -81,6 +89,7 @@ public sealed class EtwByteCounter : IByteCounterSource, IDisposable
                     _logger.LogError(ex, "ETW pump stopped unexpectedly.");
                     IsRunning = false;
                     UnavailableReason = "The trace session stopped unexpectedly. See the service log.";
+                    UnavailableCode = ReasonCodes.EtwUnavailable;
                 }
             })
             {
@@ -92,17 +101,23 @@ public sealed class EtwByteCounter : IByteCounterSource, IDisposable
 
             IsRunning = true;
             UnavailableReason = null;
+            UnavailableCode = null;
             _logger.LogInformation("ETW byte counting started on session '{Session}'.", SessionName);
             return true;
         }
         catch (UnauthorizedAccessException ex)
         {
             UnavailableReason = "Access denied creating the ETW session; administrator rights are required.";
+
+            // Access denied means the same thing to the user as not being elevated, and
+            // the advice is identical, so it maps to the same code.
+            UnavailableCode = ReasonCodes.NotElevated;
             _logger.LogWarning(ex, "{Reason}", UnavailableReason);
         }
         catch (Exception ex)
         {
             UnavailableReason = $"Could not start the ETW session: {ex.Message}";
+            UnavailableCode = ReasonCodes.EtwUnavailable;
             _logger.LogError(ex, "Failed to start ETW byte counting.");
         }
 

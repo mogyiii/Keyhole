@@ -15,6 +15,16 @@ public interface IFirewall
     /// <summary>Why rules cannot be written, or null when they can.</summary>
     string? UnavailableReason { get; }
 
+    /// <summary>
+    /// The same answer as a code the UI can translate, from
+    /// <see cref="Ipc.ReasonCodes"/>. Null when rules can be written.
+    ///
+    /// Separate from the sentence above because the two have different readers: the
+    /// sentence goes to the log in English, where it is easier to search; the code goes
+    /// to the interface, which says it in the user's language.
+    /// </summary>
+    string? UnavailableCode { get; }
+
     /// <summary>Every Keyhole-owned rule currently present in the firewall.</summary>
     IReadOnlyList<FirewallRule> ListKeyholeRules();
 
@@ -28,5 +38,17 @@ public interface IFirewall
     void Remove(string firewallRuleName);
 }
 
-public sealed class FirewallException(string message, Exception? inner = null)
-    : Exception(message, inner);
+/// <summary>
+/// A firewall operation that failed. Carries a reason code beside its message for the
+/// same reason everything else does: the message goes to the English log, the code goes to
+/// the interface, which says it in the user's language.
+/// </summary>
+public sealed class FirewallException(
+    string message,
+    string code = Ipc.ReasonCodes.BlockRuleFailed,
+    Exception? inner = null)
+    : Exception(message, inner)
+{
+    /// <summary>One of the blocking <see cref="Ipc.ReasonCodes"/>.</summary>
+    public string Code { get; } = code;
+}

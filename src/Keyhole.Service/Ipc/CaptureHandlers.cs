@@ -35,6 +35,11 @@ public sealed class ListCapturesHandler(CaptureService capture) : IIpcMethodHand
         PcapFile = session.PcapFile,
         PcapBytes = capture.GetPcapSize(session.PcapFile),
         RecordingIssue = capture.GetRecordingIssue(session.Id),
+
+        // Sent unconditionally rather than only with the size-limit code: it is one
+        // integer, and a value that is always present is one fewer thing for the
+        // interface to reason about.
+        SizeLimitMegabytes = (int)(capture.MaxPcapBytes / (1024 * 1024)),
     };
 }
 
@@ -66,12 +71,7 @@ public sealed class DecodeCaptureHandler(CaptureService capture, CaptureDecoder 
             // Not an error: a session without Npcap collects TLS keys and no packets, and
             // there is simply nothing to decode.
             return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(
-                new DecodeCaptureResponse
-                {
-                    Summary = "This session recorded no packets, so there is nothing to decode. " +
-                              "Packet recording needs Npcap.",
-                    Failure = "no packet capture for this session",
-                },
+                new DecodeCaptureResponse { Failure = ReasonCodes.DecodeNoCapture },
                 IpcChannel.Json));
         }
 
@@ -92,21 +92,22 @@ public sealed class DecodeCaptureHandler(CaptureService capture, CaptureDecoder 
             .Select(ToSummary)
             .ToList();
 
-        var summary = truncated
-            ? $"{result.Summary} Showing the first {MaxExchanges} of " +
-              $"{result.Exchanges.Count} requests."
-            : result.Summary;
-
         return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(
             new DecodeCaptureResponse
             {
                 Exchanges = exchanges,
-                Summary = summary,
+
+                // Counts rather than a sentence. The interface composes the summary, in
+                // the user's language, from exactly these numbers -- which is also why
+                // every outcome has to land in one of them.
                 Conversations = result.Conversations,
                 Decrypted = result.Decrypted,
+                EncryptedWithoutKeys = result.EncryptedWithoutKeys,
                 HandshakeMissing = result.HandshakeMissing,
                 DecryptionFailed = result.DecryptionFailed,
-                Failure = result.Failure,
+                QuicBytes = result.QuicBytes,
+                Truncated = truncated ? result.Exchanges.Count - MaxExchanges : 0,
+                Failure = result.FailureCode,
             },
             IpcChannel.Json));
     }
@@ -200,8 +201,9 @@ public sealed class StartCaptureHandler(CaptureService capture) : IIpcMethodHand
         }
         catch (CaptureException ex)
         {
-            // Carries a user-facing reason, so it must reach the UI intact.
-            throw new IpcInvalidParamsException(ex.Message);
+            // The code, not the sentence: the UI phrases it in the user's language. The
+            // sentence is still logged by the server's own error path.
+            throw new IpcInvalidParamsException(ex.Code);
         }
     }
 }

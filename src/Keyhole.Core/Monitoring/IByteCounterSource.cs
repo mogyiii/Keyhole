@@ -12,8 +12,20 @@ public interface IByteCounterSource
     /// </summary>
     bool IsRunning { get; }
 
-    /// <summary>Why the source is not running, for the UI to explain. Null when running.</summary>
+    /// <summary>
+    /// Why the source is not running, in English, for the log. Null when running.
+    /// </summary>
     string? UnavailableReason { get; }
+
+    /// <summary>
+    /// The same answer as a code the UI can translate, from
+    /// <see cref="Ipc.ReasonCodes"/>. Null when running.
+    ///
+    /// Two fields rather than one because they serve different readers: the sentence goes
+    /// in the service log, where English is easier to search and to paste into an issue,
+    /// and the code goes to the interface, which has to say it in the user's language.
+    /// </summary>
+    string? UnavailableCode { get; }
 
     /// <summary>Bytes seen for a connection since monitoring started.</summary>
     ByteCounts GetCounts(ConnectionKey key);
@@ -40,11 +52,13 @@ public readonly record struct ByteCounts(long Sent, long Received)
 public readonly record struct UdpPeer(string RemoteAddress, int RemotePort, long Sent, long Received);
 
 /// <summary>A source that reports nothing, used when byte counting is unavailable.</summary>
-public sealed class NullByteCounterSource(string reason) : IByteCounterSource
+public sealed class NullByteCounterSource(string reason, string? code = null) : IByteCounterSource
 {
     public bool IsRunning => false;
 
     public string? UnavailableReason { get; } = reason;
+
+    public string? UnavailableCode { get; } = code ?? Ipc.ReasonCodes.EtwUnavailable;
 
     public ByteCounts GetCounts(ConnectionKey key) => ByteCounts.Zero;
 

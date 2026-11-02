@@ -39,6 +39,12 @@ szűkítve, a kulcsokkal **egy pcapng fájlba**. A Wireshark így magától, vis
 meg — nincs keylog-útvonalat beállítani. A Capture fülön pedig ott a kérés/válasz lista:
 metódus, URL, státusz, fejlécek, méret, idő. HTTP/1.1 és HTTP/2 (HPACK-kal).
 
+**Magyar és angol felület.** Alapértelmezésben a rendszer nyelvét követi, a Beállítások
+fülön felülírható (Automatikus / English / Magyar), és a váltás azonnal érvényes —
+újraindítás nélkül. A szolgáltatás nem küld kész mondatokat, hanem kódokat, amiket a
+felület önt szavakba: így a magyarázó szöveg — a „miért nulla minden", a „miért nem
+olvasható ez a kapcsolat" — is magyar, nem csak a feliratok.
+
 ---
 
 ## Telepítés

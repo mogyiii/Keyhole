@@ -41,9 +41,15 @@ public sealed class MonitorService(
 
     public int ActiveConnections { get; private set; }
 
-    /// <summary>Why byte counting is unavailable, or null when it is running.</summary>
+    /// <summary>
+    /// Why byte counting is unavailable, in English, for the log. Null when it is running.
+    /// </summary>
     public string? ByteCountingUnavailableReason =>
         byteCounter.IsRunning ? null : byteCounter.UnavailableReason;
+
+    /// <summary>The same answer as a code the UI can translate.</summary>
+    public string? ByteCountingUnavailableCode =>
+        byteCounter.IsRunning ? null : byteCounter.UnavailableCode;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

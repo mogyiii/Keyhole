@@ -1,3 +1,4 @@
+using Keyhole.Core.Ipc;
 using Keyhole.Core.Storage;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,6 +22,9 @@ public sealed class BlockingService(
 
     public string? UnavailableReason => firewall.UnavailableReason;
 
+    /// <summary>Why rules cannot be written, as a code the UI can translate.</summary>
+    public string? UnavailableCode => firewall.UnavailableCode;
+
     public IReadOnlyList<BlockRule> ListRules() => rules.ListAll();
 
     /// <summary>
@@ -33,13 +37,15 @@ public sealed class BlockingService(
 
         if (!File.Exists(executablePath))
         {
-            throw new BlockingException($"No executable at '{executablePath}'.");
+            throw new BlockingException(
+                $"No executable at '{executablePath}'.", ReasonCodes.BlockNoExecutable);
         }
 
         if (!firewall.CanModifyRules)
         {
             throw new BlockingException(
-                firewall.UnavailableReason ?? "Firewall rules cannot be modified.");
+                firewall.UnavailableReason ?? "Firewall rules cannot be modified.",
+                firewall.UnavailableCode ?? ReasonCodes.FirewallUnreachable);
         }
 
         var rule = new BlockRule
@@ -79,7 +85,8 @@ public sealed class BlockingService(
         if (!firewall.CanModifyRules)
         {
             throw new BlockingException(
-                firewall.UnavailableReason ?? "Firewall rules cannot be modified.");
+                firewall.UnavailableReason ?? "Firewall rules cannot be modified.",
+                firewall.UnavailableCode ?? ReasonCodes.FirewallUnreachable);
         }
 
         if (rule.FirewallRuleName is { } name)
@@ -96,12 +103,14 @@ public sealed class BlockingService(
     public BlockRule SetEnabled(long ruleId, bool enabled)
     {
         var rule = rules.FindById(ruleId)
-                   ?? throw new BlockingException($"No rule with id {ruleId}.");
+                   ?? throw new BlockingException(
+                       $"No rule with id {ruleId}.", ReasonCodes.BlockNoRule);
 
         if (!firewall.CanModifyRules)
         {
             throw new BlockingException(
-                firewall.UnavailableReason ?? "Firewall rules cannot be modified.");
+                firewall.UnavailableReason ?? "Firewall rules cannot be modified.",
+                firewall.UnavailableCode ?? ReasonCodes.FirewallUnreachable);
         }
 
         var updated = rule with { IsEnabled = enabled };
@@ -224,5 +233,13 @@ public sealed record ReconciliationResult(
         Restored.Count > 0 || RemovedOrphans.Count > 0 || ChangedExecutables.Count > 0;
 }
 
-public sealed class BlockingException(string message, Exception? inner = null)
-    : Exception(message, inner);
+/// <summary>
+/// A blocking request that could not be carried out, with a reason code beside the
+/// message: the message is for the log, the code is what the interface translates.
+/// </summary>
+public sealed class BlockingException(string message, string code, Exception? inner = null)
+    : Exception(message, inner)
+{
+    /// <summary>One of the blocking <see cref="Ipc.ReasonCodes"/>.</summary>
+    public string Code { get; } = code;
+}

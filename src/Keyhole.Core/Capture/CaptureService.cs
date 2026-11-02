@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Keyhole.Core.Capture.Recording;
+using Keyhole.Core.Ipc;
 using Keyhole.Core.Monitoring;
 using Keyhole.Core.Storage;
 using Microsoft.Extensions.Logging;
@@ -86,7 +87,8 @@ public sealed class CaptureService(
 
         if (!File.Exists(executablePath))
         {
-            throw new CaptureException($"No executable at '{executablePath}'.");
+            throw new CaptureException(
+                $"No executable at '{executablePath}'.", ReasonCodes.CaptureNoExecutable);
         }
 
         var startedUtc = DateTimeOffset.UtcNow;
@@ -113,11 +115,16 @@ public sealed class CaptureService(
         try
         {
             process = Process.Start(startInfo)
-                      ?? throw new CaptureException($"Could not start '{executablePath}'.");
+                      ?? throw new CaptureException(
+                          $"Could not start '{executablePath}'.",
+                          ReasonCodes.CaptureLaunchFailed);
         }
         catch (Exception ex) when (ex is not CaptureException)
         {
-            throw new CaptureException($"Could not start '{executablePath}': {ex.Message}", ex);
+            throw new CaptureException(
+                $"Could not start '{executablePath}': {ex.Message}",
+                ReasonCodes.CaptureLaunchFailed,
+                ex);
         }
 
         // Read once, before anything can dispose the Process. A short-lived program can
@@ -231,7 +238,7 @@ public sealed class CaptureService(
         {
             _recordings[sessionId] = recording;
 
-            if (recording.UnavailableReason is { } unavailable)
+            if (recording.UnavailableCode is { } unavailable)
             {
                 // Recorded now rather than on stop: a recording that never started has
                 // nothing to report later, and this is the reason a user most needs.
@@ -314,8 +321,8 @@ public sealed class CaptureService(
             // produced a capture that is less than the user asked for. Remembered so the
             // finished session can still say so.
             var issue = summary.CapReached
-                ? $"recording stopped at the {MaxPcapBytes / (1024 * 1024)} MB limit"
-                : summary.Detail;
+                ? ReasonCodes.RecordingSizeLimit
+                : summary.DetailCode;
 
             if (issue is not null)
             {
@@ -376,14 +383,14 @@ public sealed class CaptureService(
         {
             if (_recordings.TryGetValue(sessionId, out var recording))
             {
-                if (recording.UnavailableReason is { } reason)
+                if (recording.UnavailableCode is { } code)
                 {
-                    return reason;
+                    return code;
                 }
 
                 if (!recording.IsRecording)
                 {
-                    return "recording stopped at the size limit";
+                    return ReasonCodes.RecordingSizeLimit;
                 }
 
                 return null;
@@ -481,7 +488,8 @@ public sealed class CaptureService(
             if (suffix > 1000)
             {
                 throw new CaptureException(
-                    $"Could not find an unused capture folder near '{baseName}'.");
+                    $"Could not find an unused capture folder near '{baseName}'.",
+                    ReasonCodes.CaptureLaunchFailed);
             }
         }
 

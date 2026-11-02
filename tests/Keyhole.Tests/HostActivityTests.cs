@@ -203,6 +203,9 @@ public class HostActivityTests
 
         public string? UnavailableReason => null;
 
+        /// <summary>The same answer as a code, for the interface to translate.</summary>
+        public string? UnavailableCode => null;
+
         public ByteCounts GetCounts(ConnectionKey key)
         {
             var flow = flows.FirstOrDefault(f => f.Connection.Key.Equals(key));

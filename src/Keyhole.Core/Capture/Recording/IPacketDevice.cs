@@ -67,9 +67,15 @@ public interface IPacketDeviceFactory
 /// Why packet recording cannot run, or null when it can. A sentence for the user, not a
 /// diagnostic: "Npcap is not installed" is actionable, an exception type is not.
 /// </param>
+/// <param name="UnavailableCode">
+/// The same answer as a code the interface can translate, from
+/// <see cref="Ipc.ReasonCodes"/>. The sentence above is for the log.
+/// </param>
 public sealed record PacketDeviceSet(
     IReadOnlyList<IPacketDevice> Devices,
-    string? UnavailableReason)
+    string? UnavailableReason,
+    string? UnavailableCode = null)
 {
-    public static PacketDeviceSet Unavailable(string reason) => new([], reason);
+    public static PacketDeviceSet Unavailable(string reason, string code) =>
+        new([], reason, code);
 }

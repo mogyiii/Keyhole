@@ -131,44 +131,44 @@ public sealed record ServiceStatus
     public int? ActiveConnections { get; init; }
 
     /// <summary>
-    /// Why byte totals read zero, or null when counting works. Connection tracking runs
-    /// unelevated but the ETW session does not, so the UI must be able to say why volume
-    /// figures are missing instead of showing zeros that look like real measurements.
+    /// Why byte totals read zero, as a <see cref="ReasonCodes"/> value, or null when
+    /// counting works. Connection tracking runs unelevated but the ETW session does not,
+    /// so the UI must be able to say why volume figures are missing instead of showing
+    /// zeros that look like real measurements.
     /// </summary>
-    public string? ByteCountingUnavailableReason { get; init; }
+    public string? ByteCountingUnavailable { get; init; }
 
     /// <summary>
     /// Why blocking is unavailable, or null when rules can be created. Lets the UI
     /// disable the block button with an explanation instead of failing on click.
     /// </summary>
-    public string? BlockingUnavailableReason { get; init; }
+    public string? BlockingUnavailable { get; init; }
 
     /// <summary>
-    /// Why packet recording is unavailable, or null when it works.
+    /// "ready", "missing", "stopped" or "unusable".
     ///
-    /// Reported separately from the other two because its cause is different in kind:
-    /// those need elevation, this needs Npcap, which Keyhole does not ship and cannot
-    /// install on the user's behalf. A session still logs TLS keys without it.
-    /// </summary>
-    public string? PacketCaptureUnavailableReason { get; init; }
-
-    /// <summary>
-    /// "ready", "missing", "stopped" or "unusable" — enough for the UI to decide whether
-    /// offering to download Npcap would actually help.
+    /// Carries the whole packet-capture story on its own, which is why there is no
+    /// separate prose field: the four states are exactly the four different pieces of
+    /// advice, and the UI can decide from this alone whether offering to download Npcap
+    /// would actually help.
     /// </summary>
     public string? NpcapState { get; init; }
 
-    /// <summary>Installed Npcap version, when it reports one.</summary>
+    /// <summary>Installed Npcap version, when it reports one. Not translatable.</summary>
     public string? NpcapVersion { get; init; }
 
     /// <summary>
     /// Why country and operator lookups are unavailable, or null when they work.
-    ///
-    /// Names the folder and the files it wants, because "GeoIP unavailable" leaves the
-    /// user with nothing to do about it. Keyhole does not download them: the databases are
-    /// MaxMind's and need a free account.
+    /// One of the GeoIP <see cref="ReasonCodes"/>.
     /// </summary>
-    public string? GeoIpUnavailableReason { get; init; }
+    public string? GeoIpUnavailable { get; init; }
+
+    /// <summary>
+    /// Where the GeoIP databases are looked for. A path, so it travels as data rather
+    /// than inside a sentence — the UI needs to name it, and naming it is what makes the
+    /// explanation actionable.
+    /// </summary>
+    public string? GeoIpDirectory { get; init; }
 }
 
 /// <summary>Parameters for <see cref="IpcMethods.ListFlows"/>.</summary>
@@ -329,11 +329,18 @@ public sealed record CaptureSummary
     public long PcapBytes { get; init; }
 
     /// <summary>
-    /// Why this session is not recording packets, or null when it is. Carries the reason
-    /// all the way to the UI so a keylog-only session explains itself instead of showing
-    /// an empty packet count.
+    /// Why this session is not recording packets, as a <see cref="ReasonCodes"/> value, or
+    /// null when it is. Carries the reason all the way to the UI so a keylog-only session
+    /// explains itself instead of showing an empty packet count.
     /// </summary>
     public string? RecordingIssue { get; init; }
+
+    /// <summary>
+    /// The size ceiling in megabytes, present when <see cref="RecordingIssue"/> says the
+    /// limit was reached. A number, so the UI can say which limit without the service
+    /// composing the sentence.
+    /// </summary>
+    public int? SizeLimitMegabytes { get; init; }
 }
 
 /// <summary>Parameters for <see cref="IpcMethods.DecodeCapture"/>.</summary>
@@ -350,14 +357,17 @@ public sealed record DecodeCaptureResponse
 {
     public IReadOnlyList<ExchangeSummary> Exchanges { get; init; } = [];
 
-    /// <summary>A sentence summarising the pass, for the UI to show above the list.</summary>
-    public required string Summary { get; init; }
-
     /// <summary>TCP connections carrying TLS in the capture.</summary>
     public int Conversations { get; init; }
 
     /// <summary>How many of those were decrypted.</summary>
     public int Decrypted { get; init; }
+
+    /// <summary>
+    /// How many carried TLS the capture holds no key for. Almost always an application on
+    /// Windows' own TLS stack, which ignores SSLKEYLOGFILE.
+    /// </summary>
+    public int EncryptedWithoutKeys { get; init; }
 
     /// <summary>
     /// How many were already open when recording started, so their handshake — and with it
@@ -371,8 +381,24 @@ public sealed record DecodeCaptureResponse
     /// </summary>
     public int DecryptionFailed { get; init; }
 
-    /// <summary>Why nothing could be decoded at all, or null when the pass ran.</summary>
+    /// <summary>
+    /// Why nothing could be decoded at all, as a <see cref="ReasonCodes"/> value, or null
+    /// when the pass ran.
+    /// </summary>
     public string? Failure { get; init; }
+
+    /// <summary>
+    /// Bytes of QUIC traffic recorded. Reported because it is the most likely reason a
+    /// browser capture looks emptier than expected, and because the UI composes that
+    /// sentence itself.
+    /// </summary>
+    public long QuicBytes { get; init; }
+
+    /// <summary>
+    /// How many exchanges were dropped to fit the answer in one IPC frame, or zero when
+    /// none were. A number rather than a sentence, so the UI can phrase the truncation.
+    /// </summary>
+    public int Truncated { get; init; }
 }
 
 /// <summary>One request and its response, as the UI shows it.</summary>
@@ -390,7 +416,10 @@ public sealed record ExchangeSummary
     /// <summary>Request to response, in milliseconds, or null when no response arrived.</summary>
     public double? DurationMs { get; init; }
 
-    /// <summary>Why this exchange is only partly recovered, or null when it is whole.</summary>
+    /// <summary>
+    /// Why this exchange is only partly recovered, as a <see cref="ReasonCodes"/> value,
+    /// or null when it is whole.
+    /// </summary>
     public string? Incomplete { get; init; }
 
     public IReadOnlyList<HeaderPair> RequestHeaders { get; init; } = [];
